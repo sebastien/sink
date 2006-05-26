@@ -1,0 +1,19 @@
+== TODO
+
+
+Tracking
+========
+
+	- Add filters
+	- Module to plug diff/rsync to speed up the whole process of detecting what
+	  has changed.
+	- Cut the fat of the node state objects, and investigate the possibility to
+	  store them in a lightweight, fast database.
+	- Make a filesystem interaface that allows to plug-in other backends
+	- Maybe get rid of the XML output... thought I'm not sure
+	- Replace walknodestate by iteartor
+	- Use the Set module instead of the set function, test which one is faster
+	- Created => Added, Modified => Changed ?
+	- Don't remember why child nodes have to be canonically sorted... this takes
+	  unnecessary time
+	

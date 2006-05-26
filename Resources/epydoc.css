@@ -1,0 +1,139 @@
+body
+{
+	font-family		: "Bitstream Vera Sans",Helvetica,Arial,Verdana,sans-serif;
+	font-size		: 8pt;
+	margin			: 10pt;
+	color			: #222222;
+	text-align		: justify;
+}
+
+a			{ text-decoration: none ; color: #685565;}
+a:active	{ text-decoration: none ; color: #685565; }
+a:visited	{ text-decoration: none ; color: #685565; }
+a:hover		{ text-decoration: underline; color: #986677; }
+
+.navbar
+{
+	color			: gray;
+}
+
+table
+{
+
+}
+table.navbar
+{
+	border			: 1px dotted gray;
+	background-color: white;
+}
+
+table.navbar p.nomargin
+{
+	padding-right	: 10pt;
+	color			: #983759;
+}
+
+table.navbar th.navselect
+{
+	background-color: gray;
+	color			: white;
+	font-weight		: bold;
+}
+
+font
+{
+	font-size		: 8pt;
+	color			: gray;
+}
+
+hr
+{
+	border			: 1px;
+}
+
+/* Module summary page */
+
+li
+{
+	margin-top		: 1em;
+}
+
+li i
+{
+	display			: block;
+	clear			: right;
+	font-style		: normal;
+}
+
+/* Class summary page */
+
+h2.class, code
+{
+	color			: #983759;
+}
+
+h2.class
+{
+	display			: block;
+	margin			: 0px;
+	text-align		: center;
+	margin-top		: 3em;
+	margin-bottom	: 2em;
+}
+
+table.summary, table.details, table.func-details
+{
+	border			: 0px;
+	background-color: white;
+}
+
+table.summary tr, table.summary td, table.summary th,
+table.details tr, table.details td, table.details th
+{
+	background-color: white;
+	border			: 0px;
+}
+
+table.summary td 
+{
+	background-color: #EEEEEE;
+	padding			: 5pt;
+}
+
+table.func-details h3
+{
+	display			: block;
+	background-color: #EEEEEE;
+	font-family		: monospace;
+	font-size		: 8pt;
+	font-weight		: normal;
+	color			: #983759;
+	padding			: 5pt;
+}
+
+/* Index page */
+
+table.index
+{
+	border			: 0px;
+	background-color: white;
+}
+
+table.index tr, table.index td, table.index th
+{
+	background-color: white;
+	border			: 0px;
+}
+
+table.index th
+{
+	font-size		: 12pt;
+	padding-top		: 2em;
+	padding-bottom	: 2em;
+}
+
+table.index td
+{
+	padding-left	: 20pt;
+}
+
