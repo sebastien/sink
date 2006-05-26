@@ -9,22 +9,18 @@
 # License           :   BSD License (revised)
 # -----------------------------------------------------------------------------
 # Creation date     :   03-Dec-2004
-# Last mod.         :   16-Jan-2006
+# Last mod.         :   19-Apr-2006
 # History           :
+#                       19-Apr-2006 More understandable output, added multiple
+#                       directories comparison, enhanced usage information,
+#                       added -d option.
+#                       10-Mar-2006 Small bug fix
 #                       22-Feb-2006 Added sorted output
 #                       13-Feb-2006 Enhanced report
 #                       16-Jan-2006 Added easy import snippet
 #                       19-Dec-2004 Checkin improvements (SPE)
 #                       03-Dec-2004 First implementation (SPE)
-#
-# Bugs              :
-#                       -
-# To do             :
-#                       -
-#
-# Notes             :
-#                       -
-
+# -----------------------------------------------------------------------------
 
 import os, sys, shutil, getopt
 from os.path import basename, dirname, exists
@@ -37,7 +33,7 @@ except:
 	sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 	from sink import Tracking
 
-__version__ = "0.9.1"
+__version__ = "0.9.5"
 
 CONTENT_MODE = True
 TIME_MODE    = False
@@ -65,33 +61,72 @@ class Logger:
 	def tip( self, tip ):
 		sys.stdout.write( "TIP:\t%s\n" % (tip))
 
-def listChanges( changes, source, destination, logger ):
+def listChanges( changes, origin, compared, logger, diffs=[] ):
 	"""Outputs a list of changes, with files only in source, fiels only in
 	destination and modified files."""
-	added   = changes.getOnlyInOldState()
-	removed = changes.getOnlyInNewState()
-	changed = changes.getModified()
-	added.sort(lambda a,b:cmp(a.location(), b.location()))
-	removed.sort(lambda a,b:cmp(a.location(), b.location()))
-	changed.sort(lambda a,b:cmp(a.location(), b.location()))
-	logger.message( "[S][ ]  " + source)
-	logger.message( "[ ][D]  " + destination)
-	logger.message( "------")
-	for node in added:
-		logger.message( "[ ][*]\t" + node.location() )
-	for node in removed:
-		logger.message( "[*][ ]\t" + node.location() )
-	for node in changed:
-		if node.isDirectory(): continue
-		old_node = changes.previousState.nodeWithLocation(node.location())
-		new_node = changes.newState.nodeWithLocation(node.location())
-		if old_node.getAttribute("Modification") < new_node.getAttribute("Modification"):
-			logger.message( "[*][+]\t" + node.location() )
-		else:
-			logger.message( "[+][*]\t" + node.location() )
-	if added:   logger.message( "\t%s were added" % (len(added)))
-	if removed: logger.message( "\t%s were added" % (len(removed)))
-	if changed: logger.message( "\t%s were changed" % (len(changed)))
+	ADDED   = "[+]"
+	REMOVED = "[-]"
+	NEWER   = "[M]"
+	OLDER   = "[m]"
+	SAME    = "[.]"
+	all_locations = []
+	all_locations_keys = {}
+	# We get the locations by changes
+	for change in changes:
+		locations = {}
+		removed   = change.getOnlyInOldState()
+		added     = change.getOnlyInNewState()
+		changed   = change.getModified()
+		unchanged = change.getUnmodified()
+		added.sort(lambda a,b:cmp(a.location(), b.location()))
+		removed.sort(lambda a,b:cmp(a.location(), b.location()))
+		changed.sort(lambda a,b:cmp(a.location(), b.location()))
+		for node in added:
+			if node.isDirectory(): continue
+			all_locations_keys[node.location()] = True
+			locations[node.location()] = ADDED
+		for node in removed:
+			if node.isDirectory(): continue
+			all_locations_keys[node.location()] = True
+			locations[node.location()] = REMOVED
+		for node in changed:
+			if node.isDirectory(): continue
+			all_locations_keys[node.location()] = True
+			old_node = change.previousState.nodeWithLocation(node.location())
+			new_node = change.newState.nodeWithLocation(node.location())
+			if old_node.getAttribute("Modification") < new_node.getAttribute("Modification"):
+				locations[node.location()] = NEWER
+			else:
+				locations[node.location()] = OLDER
+		for node in unchanged:
+			if node.isDirectory(): continue
+			all_locations_keys[node.location()] = True
+			locations[node.location()] = SAME
+		all_locations.append(locations)
+	# Now we print the result
+	all_locations_keys = all_locations_keys.keys()
+	all_locations_keys.sort(lambda a,b:cmp((a.count("/"),a),(b.count("/"), b)))
+	format  = "%0" + str(len(str(len(all_locations_keys))) ) + "d %s %s"
+	counter = 0
+	for loc in all_locations_keys:
+		if origin.nodeWithLocation(loc) == None: state = "[ ]"
+		else: state = SAME
+		for locations in all_locations:
+			node = locations.get(loc)
+			if node == None: state += "[ ]"
+			else: state += node
+		logger.message(format % (counter, state, loc))
+		if counter in diffs:
+			command = 'gvimdiff %s %s' % (
+				origin.nodeWithLocation(loc).getAbsoluteLocation(),
+				compared[0].nodeWithLocation(loc).getAbsoluteLocation()
+			)
+			os.system(command)
+		counter += 1
+	# if added:     logger.message( "\t%5s were added    [+]" % (len(added)))
+	# if removed:   logger.message( "\t%5s were removed  [-]" % (len(removed)))
+	# if changed:   logger.message( "\t%5s were modified [M]" % (len(changed)))
+	# if unchanged: logger.message( "\t%5s are the same  [.]" % (len(unchanged)))
 
 
 def copyFile( source, destination ):
@@ -146,24 +181,34 @@ def checkin( changes, source, destination, logger ):
 USAGE = """\
 Sink - v.%s
 
-  Sink list changes between a source directory and a destination directory and
-  optionaly updates the destination directory to be identical to the source
-  directory.
+  Sink lists changes between an origin directory and a list of compared
+  directories. 
 
-  Usage:    sink [MODE] [OPERATION] SOURCE DESTINATION
+  Usage:    sink [OPTIONS] [OPERATION] ORIGIN COMPARED...
 
-  Modes:
+  ORIGIN    is the directory to which we want to compare the others
+  COMPARED  is a list of directories that will be compared to ORIGIN
+
+  Options:
     -t, --time (default)   Uses timestamp to detect changes
     -c, --content          Uses content analysis to detect changes
         --ignore-spaces    Ignores the spaces when analyzing the content
+        --ignore GLOBS     Ignores the files that match the glob
+        --only   GLOBS     Only accepts the file that match glob
+
+    GLOBS understand '*' and '?', will refere to the basename and can be
+    separated by commas.
 
   Operations:
     -l, --list (default)   List changes made to the source directory
+        --diff             Specifies the diff command to be used with -d
+        -dNUM              Shows the diff for the item NUM in the list
     -o, --checkout         Updates the destination
     -i, --checkin          Updates the source
 
-    Note that by default, checkin and checkout operation never remove files, they
-    only add or update files.
+ 
+  Note that by default, checkin and checkout operation never remove files, they
+  only add or update files.
 
 """ % (__version__)
 
@@ -185,15 +230,16 @@ def run( arguments, runningPath=".", logger=None ):
 
 	operation     = listChanges
 	mode          = TIME_MODE
+	diffs         = []
 	ignore_spaces = False
 
 	# We extract the arguments
 	try:
-		optlist, args = getopt.getopt( arguments, "cthVvli",\
+		optlist, args = getopt.getopt( arguments, "cthVvld:i",\
 		["version", "help", "verbose", "list", "checkin", "checkout",
-		"time", "content", "ignore-spaces", "ignorespaces"])
+		"time", "content", "ignore-spaces", "ignorespaces", "diff"])
 	except:
-		args=[]
+		args    = []
 		optlist = []
 
 	# We parse the options
@@ -213,34 +259,51 @@ def run( arguments, runningPath=".", logger=None ):
 			ignore_spaces = True
 		elif opt in ('-t', '--time'):
 			mode = TIME_MODE
-
+		elif opt in ('-d', '--diff'):
+			diffs.append(int(arg))
+	print diffs
 	# We ensure that there are enough arguments
-	if len(args) != 2:
+	if len(args) < 2:
+		print optlist
+		print args
 		logger.error("Bad arguments\n" + USAGE)
 		sys.exit()
 
-	source_path, dest_path = args
-	if not os.path.exists(source_path):
-		logger.error("Source path does not exist.") ; sys.exit()
-	if not os.path.exists(dest_path):
-		logger.error("Dest path does not exist.") ; sys.exit()
+	origin_path    = args[0]
+	compared_paths = args[1:]
+	# Wensures that the origin and compared directories exist
+	if not os.path.isdir(origin_path):
+		logger.error("Origin directory does not exist.") ; sys.exit()
+	for path in compared_paths:
+		if not os.path.isdir(path):
+			logger.error("Compared directory does not exist.") ; sys.exit()
 
 	# Detects changes between source and destination
-	tracker		 = Tracking.Tracker()
-	source_state = Tracking.State(source_path)
-	dest_state   = Tracking.State(dest_path)
+	tracker         = Tracking.Tracker()
+	origin_state    = Tracking.State(origin_path)
+	compared_states = []
+	for path in compared_paths:
+		compared_states.append(Tracking.State(path))
 
 	# Scans the source and destination, and updates
-	logger.message("Scanning source: " + source_path)
-	source_state.populate( lambda x: mode )
-	logger.message("Scanning destination: " + dest_path)
-	dest_state.populate(lambda x: mode )
-	logger.message("Comparing...")
-	changes      = tracker.detectChanges(dest_state, source_state)
+	logger.message("Scanning origin: " + origin_path)
+	origin_state.populate( lambda x: mode )
+	for state in compared_states:
+		logger.message("Scanning compared: " + state.location())
+		state.populate(lambda x: mode )
+	changes     = []
+	any_changes = False
+	for state in compared_states:
+		logger.message("Comparing '%s' to origin" % (state.location()))
+		changes.append(tracker.detectChanges(state, origin_state))
+		any_changes = changes[-1].anyChanges() or any_changes
 	
 	# We apply the operation
-	if changes.anyChanges():
-		operation( changes, source_path, dest_path, logger)
+	if any_changes:
+		if operation == listChanges and diffs:
+			operation( changes, origin_state, compared_states, logger, diffs)
+		else:
+			operation( changes, origin_state, compared_states, logger)
 	else:
 		logger.message("Nothing changed.")
 

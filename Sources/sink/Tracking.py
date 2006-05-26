@@ -8,8 +8,11 @@
 # License           :   BSD License (revised)
 # -----------------------------------------------------------------------------
 # Creation date     :   09-Dec-2003
-# Last mod.         :   22-Feb-2006
+# Last mod.         :   19-Apr-2006
 # History           :
+#                       19-Apr-2006 Removed the XML serializer and parser,
+#                       updated signature management, and made tracker use time
+#                       instead of signature by default.
 #                       22-Feb-2006 Ensured that file signature returns
 #                       something
 #                       17-Jan-2006 Some API refactoring (compatibility broken) (SPE)
@@ -182,7 +185,7 @@ class NodeState:
 		# Links may point to unexisting locations
 		assert os.path.islink(self.getAbsoluteLocation()) or self.exists()
 		self._updateAttributes()
-		self._updateSignature()
+		if self._usesSignature: self._updateSignature()
 		self._state.cacheNodeState(self)
 
 	def _updateAttributes( self ):
@@ -244,6 +247,7 @@ class NodeState:
 	def getSignature( self ):
 		"""Returns the concatenation of the content signature and the
 		attributes signature, separated by a dash."""
+		assert self.usesSignature(), "Node does not use signature:" + str(self)
 		return str(self.getContentSignature())+"-"+str(self.getAttributesSignature())
 	
 	def __repr__(self):
@@ -409,10 +413,13 @@ class FileNodeState(NodeState):
 	def getData( self ):
 		"""Returns the data contained in this file as a string."""
 		fd = None
-		fd = open(self.getAbsoluteLocation(), "r")
-		assert fd!=None
-		data = fd.read()
-		fd.close()
+		try:
+			fd = open(self.getAbsoluteLocation(), "r")
+			assert fd!=None
+			data = fd.read()
+			fd.close()
+		except IOError:
+			data = ""
 		return data
 
 	def _updateSignature( self ):
@@ -596,10 +603,7 @@ class State:
 	def nodeWithLocation( self, location ):
 		"""Returns the node with the given location. The node may not exist, in
 		which case None is returned."""
-		try:
-			return self._locations[location]
-		except:
-			return None
+		return self._locations.get(location)
 
 	def nodesByLocation( self ):
 		return self._locations
@@ -754,7 +758,10 @@ class Tracker:
 	"""Creates a change object that characterises the difference between  the
 	two states."""
 
-	def detectChanges( self, newState, previousState ):
+	TIME = "Time"
+	SHA1 = "SHA-1"
+
+	def detectChanges( self, newState, previousState, method=TIME ):
 		"""Detects the changes between the new state and the previous state. This
 		returns a Change object representing all changes."""
 
@@ -783,14 +790,24 @@ class Tracker:
 
 		for location, node in same_locations:
 			previous_node = previousState.nodeWithLocation(location)
-			assert previous_node.getContentSignature()
-			assert node.getContentSignature()
-			if previous_node.getContentSignature() != node.getContentSignature():
-				changes._modified.append(node)
-				self.onModified(previous_node, node)
+			if method == Tracker.SHA1:
+				assert previous_node.getContentSignature()
+				assert node.getContentSignature()
+				if previous_node.getContentSignature() != node.getContentSignature():
+					changes._modified.append(node)
+					self.onModified(previous_node, node)
+				else:
+					changes._unmodified.append(node)
+					self.onUnmodified(previous_node, node)
 			else:
-				changes._unmodified.append(node)
-				self.onUnmodified(previous_node, node)
+				ptime = previous_node.getAttribute("Modification")
+				ntime = node.getAttribute("Modification")
+				if ptime != ntime:
+					changes._modified.append(node)
+					self.onModified(previous_node, node)
+				else:
+					changes._unmodified.append(node)
+					self.onUnmodified(previous_node, node)
 
 		# We make sure that we classified every node of the state
 		assert len(new_locations) + len(prev_locations) + len(same_locations)\
@@ -818,152 +835,5 @@ class Tracker:
 		"""Handler called when a node was removed, ie. it is not the in
 		the new state but is in the old state."""
 		node.tag(event=NodeState.REMOVED)
-
-#------------------------------------------------------------------------------
-#
-#  XML Serialisation and deserialisation
-#
-#------------------------------------------------------------------------------
-
-class StateParser:
-	"""Parses a file system file from an XML node."""
-
-	def parseState( self, node ):
-		"""Parses the given XML node."""
-		# FIXME: Handle errors
-		if node.documentElement.localName != "State":
-			return self.error(BAD_DOCUMENT_ELEMENT)
-		location = node.documentElement.getAttributeNS(None, "location")
-		state = State(location)
-
-		# We look for a recognised child node
-		root_node = None
-		for childNode in node.documentElement.childNodes:
-			root_node = self.parseChildNodeState(state, childNode)
-			if root_node:  break
-		# And set it as the root node
-		state.root(root_node)
-		state.cacheNodeStates()
-		return state
-
-	def parseChildNodeState( self, state, childNode ):
-		if childNode.localName == "Directory":
-			return self.parseDirectoryNodeState(state, childNode)
-		elif childNode.localName == "File":
-			return self.parseFileNodeState(state, childNode)
-		elif childNode.localName in ("Attributes", "signature"):
-			return None
-		else:
-			self.warning(UNKNOWN_ELEMENT % childNode.tagName)
-			return None
-
-	def parseFileNodeState( self, state, xmlNodeState ):
-		fileNodeState = FileNodeState(state, xmlNodeState.getAttributeNS(None, "location"))
-		self._initNodeState(xmlNodeState, fileNodeState)
-		return fileNodeState
-
-	def parseDirectoryNodeState( self, state, xmlNodeState ):
-		dirNodeState = DirectoryNodeState( state, xmlNodeState.getAttributeNS(None, "location"))
-		self._initNodeState(xmlNodeState, dirNodeState)
-		content = self._getNodeState( xmlNodeState, "Content" )
-		for child_xml in content.childNodes:
-			node = self.parseChildNodeState(state, child_xml)
-			if node: dirNodeState._children.append(node)
-		return dirNodeState
-
-	def _getNodeState( self, node, nodeName ):
-		for child_node in node.childNodes:
-			if child_node.nodeName == nodeName:
-				return child_node
-		return None
-
-	def _getNodeStateText( self, node ):
-		result = u""
-		for child_node in node.childNodes:
-			if child_node.nodeType == child_node.TEXT_NODE:
-				result += child_node.data
-		return result
-
-	def _initNodeState( self, xmlNodeState, fileSystemNodeState ):
-		# We get every attributes information
-		attributes_node = self._getNodeState( xmlNodeState, "Attributes" )
-		for child_node in attributes_node.childNodes:
-			attributes_name  = child_node.nodeName[0].upper()+child_node.nodeName[1:].lower()
-			if attributes_name in FILE_SYSTEM_ATTRIBUTES:
-				fileSystemNodeState._attributes[attributes_name] = self._getNodeStateText(child_node).strip()
-		# We get the signature
-		sig = self._getNodeState( xmlNodeState, "signature" )
-		fileSystemNodeState._contentSignature = self._getNodeStateText(sig)
-		return fileSystemNodeState
-
-	def warning( self, message ):
-		"""Outputs a warning message."""
-		sys.stderr.write( "WARNING:\t%s\n" % ( message ))
-		return None
-
-	def error( self, message ):
-		"""Outputs an error message."""
-		sys.stderr.write( "ERROR:\t%s\n" % ( message ))
-		return None
-
-class StateSerializer:
-
-	def serializeState( self, state ):
-		"""Returns an XML document representing the given state."""
-		impl = xml.dom.getDOMImplementation()
-		# We create the document and the document element
-		document = impl.createDocument(None, "State", None)
-		document.documentElement.setAttributeNS(None, "location", state.location())
-		# Serialize the root node attributes
-		document.documentElement.appendChild(
-			self.serializeNodeState(document, state.root())
-		)
-		return document
-
-	def serializeNodeState( self, document, node ):
-		"""Returns an XML node representing the given file system node."""
-		if isinstance(node, DirectoryNodeState):
-			return self.serializeDirectoryNodeState(document, node)
-		elif isinstance(node, FileNodeState):
-			return self.serializeFileNodeState(document, node)
-		else:
-			# FIXME: Should never go there
-			assert 1==0
-			return None
-
-	def serializeFileNodeState( self, document, fileNodeState ):
-		"""Returns an XML node representing the given file node."""
-		xml_node = document.createElementNS(None, "File")
-		return self._serializeNodeState( document, xml_node, fileNodeState )
-
-	def serializeDirectoryNodeState( self, document, dirNodeState=None ):
-		"""Returns an XML node representing the given directory node."""
-		xml_node = document.createElementNS(None, "Directory")
-		content_node = document.createElementNS(None, "Content")
-		node = self._serializeNodeState( document, xml_node, dirNodeState )
-		for childNode in dirNodeState.getChildren():
-			content_node.appendChild(self.serializeNodeState(document, childNode))
-		node.appendChild(content_node)
-		return node
-
-	def _serializeNodeState( self, document, xmlNodeState, fileNodeState ):
-		"""Returns an XML node representing the given file system node,
-		properly initilized."""
-		# We add the node name and location
-		xmlNodeState.setAttributeNS(None, "name", os.path.basename(fileNodeState.location()))
-		xmlNodeState.setAttributeNS(None, "location", fileNodeState.location())
-		# We create the signature node
-		sig = document.createElementNS(None, "signature")
-		sig.appendChild(document.createTextNode(fileNodeState.getContentSignature()))
-		xmlNodeState.appendChild(sig)
-		# We create the "Attributes" node
-		attributes_node = document.createElementNS(None, "Attributes")
-		for attributes in FILE_SYSTEM_ATTRIBUTES:
-			attributes_info = document.createElementNS(None, attributes.lower())
-			attributes_info.appendChild(document.createTextNode(
-				fileNodeState.getAttribute(attributes)))
-			attributes_node.appendChild(attributes_info)
-		xmlNodeState.appendChild(attributes_node)
-		return xmlNodeState
 
 # EOF-Unix/ASCII------------------------------------@RisingSun//Python//1.0//EN
