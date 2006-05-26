@@ -13,7 +13,7 @@
 #
 # Project name. Do not put spaces.
 PROJECT         = Sink
-PROJECT_VERSION = 0.9.0
+PROJECT_VERSION = 0.9.1
 PROJECT_STATUS  = BETA
 
 DOCUMENTATION   = Documentation

@@ -11,6 +11,7 @@
 # Creation date     :   03-Dec-2004
 # Last mod.         :   16-Jan-2006
 # History           :
+#                       22-Feb-2006 Added sorted output
 #                       13-Feb-2006 Enhanced report
 #                       16-Jan-2006 Added easy import snippet
 #                       19-Dec-2004 Checkin improvements (SPE)
@@ -36,7 +37,7 @@ except:
 	sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 	from sink import Tracking
 
-__version__ = "0.9.0"
+__version__ = "0.9.1"
 
 CONTENT_MODE = True
 TIME_MODE    = False
@@ -70,6 +71,9 @@ def listChanges( changes, source, destination, logger ):
 	added   = changes.getOnlyInOldState()
 	removed = changes.getOnlyInNewState()
 	changed = changes.getModified()
+	added.sort(lambda a,b:cmp(a.location(), b.location()))
+	removed.sort(lambda a,b:cmp(a.location(), b.location()))
+	changed.sort(lambda a,b:cmp(a.location(), b.location()))
 	logger.message( "[S][ ]  " + source)
 	logger.message( "[ ][D]  " + destination)
 	logger.message( "------")
@@ -78,6 +82,7 @@ def listChanges( changes, source, destination, logger ):
 	for node in removed:
 		logger.message( "[*][ ]\t" + node.location() )
 	for node in changed:
+		if node.isDirectory(): continue
 		old_node = changes.previousState.nodeWithLocation(node.location())
 		new_node = changes.newState.nodeWithLocation(node.location())
 		if old_node.getAttribute("Modification") < new_node.getAttribute("Modification"):
@@ -150,6 +155,7 @@ Sink - v.%s
   Modes:
     -t, --time (default)   Uses timestamp to detect changes
     -c, --content          Uses content analysis to detect changes
+        --ignore-spaces    Ignores the spaces when analyzing the content
 
   Operations:
     -l, --list (default)   List changes made to the source directory
@@ -177,14 +183,15 @@ def run( arguments, runningPath=".", logger=None ):
 	if logger==None:
 		logger = Logger()
 
-	operation = listChanges
-	mode      = TIME_MODE
+	operation     = listChanges
+	mode          = TIME_MODE
+	ignore_spaces = False
 
 	# We extract the arguments
 	try:
 		optlist, args = getopt.getopt( arguments, "cthVvli",\
 		["version", "help", "verbose", "list", "checkin", "checkout",
-		"time", "content"])
+		"time", "content", "ignore-spaces", "ignorespaces"])
 	except:
 		args=[]
 		optlist = []
@@ -201,7 +208,9 @@ def run( arguments, runningPath=".", logger=None ):
 		elif opt in ('-i', '--checkin'):
 			operation = checkin
 		elif opt in ('-c', '--content'):
-			mode = CONTENT_MODE
+			mode   = CONTENT_MODE
+		elif opt in ('--ignorespaces', '--ignore-spaces'):
+			ignore_spaces = True
 		elif opt in ('-t', '--time'):
 			mode = TIME_MODE
 

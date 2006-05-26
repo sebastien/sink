@@ -1,9 +1,20 @@
 == TODO
 
 
+- Add the possibility to track changes between more than one directory
+- Sink does not seem to work properly, especially when compared to diff...
+- Make benchmarks
+- Move to cElementTree
+- Different strategies for detecting changes :
+  - From signature
+  - From "tags" (size, etc...)
+  - By comparing actual files in real time (implies that the nodestate can be
+	extracted directly from the FS).
+
 Tracking
 ========
 
+	- Add content filtering when in SHA mode (normalize spaces for instance)
 	- Add filters
 	- Module to plug diff/rsync to speed up the whole process of detecting what
 	  has changed.

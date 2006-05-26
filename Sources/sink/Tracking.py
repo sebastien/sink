@@ -1,16 +1,17 @@
 #!/usr/bin/env python
-# Encoding: iso-8859-1 tabs=4:tabs
+# Encoding: iso-8859-1
 # vim: ts=4 noet
 # -----------------------------------------------------------------------------
-# Project           :   Archipel           <http://sofware.type-z.org/archipel>
-# Module            :   Change tracking
+# Project           :   Sink         
 # -----------------------------------------------------------------------------
 # Author            :   Sebastien Pierre (SPE)           <sebastien@type-z.org>
 # License           :   BSD License (revised)
 # -----------------------------------------------------------------------------
 # Creation date     :   09-Dec-2003
-# Last mod.         :   17-Jan-2006
+# Last mod.         :   22-Feb-2006
 # History           :
+#                       22-Feb-2006 Ensured that file signature returns
+#                       something
 #                       17-Jan-2006 Some API refactoring (compatibility broken) (SPE)
 #                       19-Dec-2004 Skip list for attributes in signature (SPE)
 #                       03-Dec-2004 Symlinks are skipped (SPE)
@@ -96,12 +97,16 @@ class NodeState:
 		return False
 	
 	def hasChildren( self ):
+		"""Tells if this node has any children."""
 		return 0
 	
 	def children( self ):
+		"""Returns the children of this node."""
 		return ()
 
 	def doOnParents(self, function):
+		"""Apply this function on this node parent, on the parent parent...
+		until the root node is reached."""
 		if self._parent:
 			function(self._parent)
 			self._parent.doOnParents(function)
@@ -127,16 +132,18 @@ class NodeState:
 
 	# Tagging___________________________________________________________________
 
-	def tag(self, name=None, **tags):
-		if name:
-			return self._tags.get(name)
+	def tag(self, _name=None, **tags):
+		"""Tags the given node with the following list of tags (given as named
+		arguments). If a single argument is given, then the value of the given
+		tag is returned."""
+		if _name:
+			return self._tags.get(_name)
 		else:
 			for key in tags:
 				self._tags[key] = tags[key]
 			return True
 
 	# Caching__________________________________________________________________
-
 
 	def isCached( self, value=None ):
 		"""Tells wether the node is cached, or not."""
@@ -155,6 +162,8 @@ class NodeState:
 			self._attributes["Location"] = location
 
 	def name(self):
+		"""Returns the name of this node. This corresponds to the basename of
+		this node location."""
 		return os.path.basename(self.location())
 		
 	def getAbsoluteLocation( self ):
@@ -412,9 +421,9 @@ class FileNodeState(NodeState):
 		# We only compute the content signature if the node is said to. This
 		# allows to perform quick changes detection when large files are
 		# involved.
-		if self.usesSignature():
-			self._contentSignature = sha.new(self.getData())
-			self._contentSignature = self._contentSignature.hexdigest()
+		# if self.usesSignature():
+		self._contentSignature = sha.new(self.getData())
+		self._contentSignature = self._contentSignature.hexdigest()
 
 #------------------------------------------------------------------------------
 #
@@ -490,9 +499,10 @@ def guessNodeStateAncestors( node, nodes ):
 #------------------------------------------------------------------------------
 
 class State:
-	"""A state object reflects the state of a particular file system location
-	by creating node objects (NodeStates) that represent the file system. 
-	These nodes can be 	queried by location and signature."""
+	"""A state object reflects the state of a particular file system location by
+	creating node objects (NodeStates) that represent the file system state at a
+	particular moment.. These nodes can be later queried by location and
+	signature."""
 
 	def __init__( self, rootLocation, rootNodeState=None, populate=False ):
 		"""Creates a new state with the given location as the root. If the populate
@@ -773,7 +783,9 @@ class Tracker:
 
 		for location, node in same_locations:
 			previous_node = previousState.nodeWithLocation(location)
-			if previous_node.getSignature() != node.getSignature():
+			assert previous_node.getContentSignature()
+			assert node.getContentSignature()
+			if previous_node.getContentSignature() != node.getContentSignature():
 				changes._modified.append(node)
 				self.onModified(previous_node, node)
 			else:
