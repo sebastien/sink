@@ -8,8 +8,9 @@
 # License           :   BSD License (revised)
 # -----------------------------------------------------------------------------
 # Creation date     :   09-Dec-2003
-# Last mod.         :   19-Apr-2006
+# Last mod.         :   21-Apr-2006
 # History           :
+#                       21-Apr-2006 Added filters for nodes
 #                       19-Apr-2006 Removed the XML serializer and parser,
 #                       updated signature management, and made tracker use time
 #                       instead of signature by default.
@@ -48,7 +49,7 @@
 #                       containing state to be processable by the change
 #                       tracker.
 
-import os, sha, stat, sys, time, xml.dom
+import os, sha, stat, sys, time, fnmatch, xml.dom
 
 # Error messages
 
@@ -75,7 +76,8 @@ class NodeState:
 	REMOVED  = "-"
 	MODIFIED = "m"
 	
-	def __init__( self, state, location, usesSignature=True ):
+	def __init__( self, state, location, usesSignature=True, accepts=(),
+	rejects=() ):
 		"""Creates a file system node with the given location. The location
 		is relative to the state root. The usesSignature parameter allows to
 		specify wether the node should use a signature or not. Large file nodes may take
@@ -87,6 +89,8 @@ class NodeState:
 		nodes exists on the file system. Otherwise the `_attributes' and `_contentSignature'
 		attributes can be set by hand."""
 		self._parent = None
+		self._accepts = accepts
+		self._rejects = rejects
 		self._attributes = {}
 		self._tags = {}
 		self._contentSignature = None
@@ -94,6 +98,8 @@ class NodeState:
 		self._usesSignature = usesSignature
 		self._belongsToState( state )
 		self.location( location )
+		assert type(self._accepts) in (tuple, list)
+		assert type(self._rejects) in (tuple, list)
 
 	def isDirectory( self ):
 		"""Tells wether the node is a directory or not."""
@@ -262,13 +268,14 @@ class NodeState:
 class DirectoryNodeState(NodeState):
 	"""A node representing a directory on the filesystem"""
 
-	def __init__( self, state, location ):
+	def __init__( self, state, location, accepts=(), rejects=() ):
 		"""Creates a new directory node.
 
 		Same operations as the file system node."""
 		# The list of child nodes
 		self._children = []
-		NodeState.__init__(self, state, location )
+		NodeState.__init__(self, state, location, usesSignature=False,
+		accepts=accepts, rejects=rejects )
 
 	def isDirectory( self ):
 		"""Returns True."""
@@ -303,13 +310,26 @@ class DirectoryNodeState(NodeState):
 		self._children = []
 		# We create new nodes for each content
 		for element_loc in content:
+			# We ensure that the node is accepted
+			matched = True
+			for a in self._accepts:
+				if not fnmatch.fnmatch(element_loc, a):
+					matched = False
+					break
+			for a in self._rejects:
+				if fnmatch.fnmatch(element_loc, a):
+					matched = False
+					break
+			if not matched:
+				continue
 			element_loc = os.path.join( self.location(), element_loc )
 			abs_element_loc = self._state.getAbsoluteLocation(element_loc)
 			# Skips symlinks
 			if os.path.islink( abs_element_loc):
 				continue
 			elif os.path.isdir( abs_element_loc ):
-				node = DirectoryNodeState( self._state, element_loc )
+				node = DirectoryNodeState( self._state, element_loc,
+				accepts=self._accepts, rejects=self._rejects )
 				node.update(nodeSignatureFilter)
 			else:
 				if nodeSignatureFilter(abs_element_loc):
@@ -511,7 +531,8 @@ class State:
 	particular moment.. These nodes can be later queried by location and
 	signature."""
 
-	def __init__( self, rootLocation, rootNodeState=None, populate=False ):
+	def __init__( self, rootLocation, rootNodeState=None, populate=False,
+	accepts=(), rejects=() ):
 		"""Creates a new state with the given location as the root. If the populate
 		variable is set to True, then the state is populated with the data gathered
 		from the fielsystem.
@@ -527,13 +548,29 @@ class State:
 		self._contentSignatures = {}
 		# Locations is a map with location as keys and file system nodes as
 		# values.
+		self._accepts   = []
+		self._rejects   = []
 		self._locations = {}
 		self._rootNodeState = None
 		if rootLocation: self.location(os.path.abspath(rootLocation))
 		else: self.location(None)
 		self.root(rootNodeState)
+		self.accepts(accepts)
+		self.rejects(rejects)
 		if populate:
 				self.populate()
+
+	def accepts( self, a ):
+		"""Specifies the GLOBS (as strings) that all inserted node must
+		match."""
+		if type(a) in (tuple,list): self._accepts.extend(a)
+		else: self._accepts.append(a)
+
+	def rejects( self, a ):
+		"""Specifies the GLOBS (as strings) that tell which node should never be
+		added."""
+		if type(a) in (tuple,list): self._rejects.extend(a)
+		else: self._rejects.append(a)
 
 	def populate( self, nodeSignatureFilter=lambda x:True):
 		"""Creates the root node for this state. This node will be
@@ -542,7 +579,8 @@ class State:
 		The nodeSignatureFilter is a predicate which tells if a node at the
 		given location should compute its signature or not.
 		"""
-		rootNodeState = DirectoryNodeState(self, "")
+		rootNodeState = DirectoryNodeState(self, "", accepts=self._accepts,
+		rejects=self._rejects)
 		rootNodeState.update(nodeSignatureFilter)
 		self._creationTime = time.localtime()
 		self.root(rootNodeState)
