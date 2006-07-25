@@ -4,7 +4,7 @@
 # -----------------------------------------------------------------------------
 # Project           :   Sink         
 # -----------------------------------------------------------------------------
-# Author            :   Sebastien Pierre (SPE)           <sebastien@type-z.org>
+# Author            :   Sebastien Pierre                 <sebastien@type-z.org>
 # License           :   BSD License (revised)
 # -----------------------------------------------------------------------------
 # Creation date     :   09-Dec-2003
@@ -15,7 +15,7 @@
 #                       containing state to be processable by the change
 #                       tracker.
 
-import os, sha, stat, sys, time, fnmatch, xml.dom
+import os, sha, stat, time, fnmatch, xml.dom
 
 # Error messages
 
@@ -615,17 +615,6 @@ class State:
 	def nodesByContentSignature( self ):
 		return self._contentSignatures
 
-	def save( self, filePath ):
-		"""Saves the state to the given file as an XML document."""
-		document = StateSerializer().serializeState(self)
-		fd = open(filePath, "w")
-		fd.write(document.toxml())
-		fd.close()
-
-	def load( self, filePath ):
-		"""Creates a new state from the given state XML document."""
-		return StateParser().parseState(xml.dom.parse(filePath))
-
 	def __repr__(self):
 		return repr(self.root())
 	
@@ -702,14 +691,14 @@ class Change:
 		"""Removes the nodes that start with the given location from this
 		change set."""
 		if location == None: return
-		for set in self._all:
+		for _set in self._all:
 			i = 0
 			# We cannot iterate on the array, because we may remove the
 			# iterated value, which seems to fuck up the iteration
-			while i < len(set):
-				node = set[i]
+			while i < len(_set):
+				node = _set[i]
 				if node.location().find(location) == 0:
-					set.pop(i)
+					_set.pop(i)
 				else:
 					i += 1
 
@@ -748,14 +737,14 @@ class Change:
 
 	def _filterAll( self, f ):
 		result = []
-		for set in self._all: result.extend(filter(f,set))
+		for _set in self._all: result.extend(filter(f,_set))
 		return result
 
 	def count( self ):
 		"""Returns the number of elements in this change."""
 		# FIXME: This is false !
 		count = 0
-		for set in self._all: count += len(set)
+		for _set in self._all: count += len(_set)
 		return count
 
 class Tracker:

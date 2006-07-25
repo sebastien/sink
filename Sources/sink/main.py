@@ -3,7 +3,6 @@
 # vim: sw=4 ts=4 tw=80 noet fenc=latin-1
 # -----------------------------------------------------------------------------
 # Project           :   Sink                   <http://sofware.type-z.org/sink>
-# Module            :   Change tracking
 # -----------------------------------------------------------------------------
 # Author            :   Sebastien Pierre                 <sebastien@type-z.org>
 # License           :   BSD License (revised)
@@ -18,10 +17,10 @@ from os.path import basename, dirname, exists
 # We try to import the sink module. If we have trouble, we simply insert the
 # path into the Python path
 try:
-	from sink import Tracking
+	from sink import tracking
 except:
 	sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-	from sink import Tracking
+	from sink import tracking
 
 __version__ = "0.9.7"
 
@@ -415,11 +414,11 @@ def run( arguments, runningPath=".", logger=None ):
 			logger.error("Compared directory does not exist.") ; sys.exit()
 
 	# Detects changes between source and destination
-	tracker         = Tracking.Tracker()
-	origin_state    = Tracking.State(origin_path, accepts=accepts, rejects=rejects)
+	tracker         = tracking.Tracker()
+	origin_state    = tracking.State(origin_path, accepts=accepts, rejects=rejects)
 	compared_states = []
 	for path in compared_paths:
-		compared_states.append(Tracking.State(path, accepts=accepts, rejects=rejects))
+		compared_states.append(tracking.State(path, accepts=accepts, rejects=rejects))
 
 	# Scans the source and destination, and updates
 	#logger.message("Scanning origin: " + origin_path)
@@ -433,10 +432,10 @@ def run( arguments, runningPath=".", logger=None ):
 		#logger.message("Comparing '%s' to origin" % (state.location()))
 		if mode == CONTENT_MODE:
 			changes.append(tracker.detectChanges(state, origin_state,
-			method=Tracking.Tracker.SHA1))
+			method=tracking.Tracker.SHA1))
 		else:
 			changes.append(tracker.detectChanges(state, origin_state,
-			method=Tracking.Tracker.TIME))
+			method=tracking.Tracker.TIME))
 		any_changes = changes[-1].anyChanges() or any_changes
 	
 	# We apply the operation

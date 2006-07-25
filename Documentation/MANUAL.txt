@@ -1,0 +1,21 @@
+== SINK MANUAL
+-- Author: Sébastien Pierre
+-- Version: 0.9.7
+
+
+Quick setup
+===========
+
+Sink is installed pretty easily using the standard Python way:
+
+>	python setup.py install
+
+this will install the `sink.main` and `sink.tracking` modules in your Python
+library and make the `sink` command available.
+
+Uses
+====
+
+Sink is primarily a tool to *detect changes multiple between directories*
+
+# vim: ts=4 sw=4 noet fenc=latin-1 syn=kiwi
