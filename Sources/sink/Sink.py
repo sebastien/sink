@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # Encoding: iso-8859-1
-# vim: ts=4 noet
+# vim: sw=4 ts=4 tw=80 noet fenc=latin-1
 # -----------------------------------------------------------------------------
 # Project           :   Sink                   <http://sofware.type-z.org/sink>
 # Module            :   Change tracking
@@ -9,20 +9,7 @@
 # License           :   BSD License (revised)
 # -----------------------------------------------------------------------------
 # Creation date     :   03-Dec-2004
-# Last mod.         :   26-May-2006
-# History           :
-#                       26-May-2006 Added configuration and filtering options
-#                       24-Apr-2006 Supports SHA1 and TIME modes, supports
-#                       output filtering.
-#                       19-Apr-2006 More understandable output, added multiple
-#                       directories comparison, enhanced usage information,
-#                       added -d option.
-#                       10-Mar-2006 Small bug fix
-#                       22-Feb-2006 Added sorted output
-#                       13-Feb-2006 Enhanced report
-#                       16-Jan-2006 Added easy import snippet
-#                       19-Dec-2004 Checkin improvements (SPE)
-#                       03-Dec-2004 First implementation (SPE)
+# Last mod.         :   25-Jul-2006
 # -----------------------------------------------------------------------------
 
 import os, sys, shutil, getopt, string, ConfigParser
@@ -36,15 +23,15 @@ except:
 	sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 	from sink import Tracking
 
-__version__ = "0.9.6"
+__version__ = "0.9.7"
 
 CONTENT_MODE = True
 TIME_MODE    = False
 ADDED        = "[+]"
-REMOVED      = "[-]"
-NEWER        = "[M]"
-OLDER        = "[m]"
-SAME         = "[.]"
+REMOVED      = " ! "
+NEWER        = "[>]"
+OLDER        = "[<]"
+SAME         = "[=]"
 ABSENT       = "   "
 
 #------------------------------------------------------------------------------
@@ -126,17 +113,38 @@ diffcommand="diff", show=None
 	all_locations_keys.sort(lambda a,b:cmp((a.count("/"),a),(b.count("/"), b)))
 	format  = "%0" + str(len(str(len(all_locations_keys))) ) + "d %s %s"
 	counter = 0
+	def find_diff( num ):
+		for _diff, _dir in diffs:
+			if _diff == num: return _dir
+		return None
 	for loc in all_locations_keys:
-		if origin.nodeWithLocation(loc) == None: state = ABSENT
-		else: state = SAME
+		# For the origin, the node is either ABSENT or SAME
+		if origin.nodeWithLocation(loc) == None:
+			state = ABSENT
+		else:
+			state = SAME
+		# For all locations
 		for locations in all_locations:
 			node = locations.get(loc)
-			if node == None: state += "[ ]"
-			else: state += node
+			if node == None:
+				if origin.nodeWithLocation(loc) == None:
+					state += ABSENT
+				else:
+					state += SAME
+			else:
+				state += node
 		logger.message(format % (counter, state, loc))
-		if counter in diffs:
+		found_diff = find_diff(counter)
+		if found_diff != None:
 			src = origin.nodeWithLocation(loc)
-			dst = compared[0].nodeWithLocation(loc)
+			found_diff -= 1
+			if found_diff == -1:
+				logger.message("Given DIR is too low, using 1 as default")
+				found_diff = 0
+			if found_diff >= len(compared):
+				logger.message("Given DIR is too high, using %s as default" % (len(compared)))
+				found_diff = len(compared)-1
+			dst = compared[found_diff-1].nodeWithLocation(loc)
 			if not src:
 				logger.message("Cannot diff\nFile only in dest:   " + dst.getAbsoluteLocation())
 			elif not dst:
@@ -149,9 +157,9 @@ diffcommand="diff", show=None
 				os.system(command)
 		counter += 1
 	# if added:     logger.message( "\t%5s were added    [+]" % (len(added)))
-	# if removed:   logger.message( "\t%5s were removed  [-]" % (len(removed)))
-	# if changed:   logger.message( "\t%5s were modified [M]" % (len(changed)))
-	# if unchanged: logger.message( "\t%5s are the same  [.]" % (len(unchanged)))
+	# if removed:   logger.message( "\t%5s were removed   ! " % (len(removed)))
+	# if changed:   logger.message( "\t%5s were modified [>]" % (len(changed)))
+	# if unchanged: logger.message( "\t%5s are the same  [=]" % (len(unchanged)))
 	if not all_locations_keys: logger.message("No changes found.")
 
 
@@ -217,7 +225,8 @@ Sink - v.%s
   Operations:
     -l, --list (default)   List changes made to the source directory
         --diff             Specifies the diff command to be used with -d
-        -dNUM              Shows the diff for the item NUM in the list
+        -dNUM:DIR          Shows the diff for the item NUM in the list, between
+                           the ORIGIN and the compared DIR (1, 2, 3, etc)
 
     -o, --checkout         Updates the destination
     -i, --checkin          Updates the source
@@ -235,19 +244,19 @@ Sink - v.%s
 
     You can also specify what you want to be listed in the diff:
 
-    [-+]s                  Hides/Shows SAME files
-    [-+]a                  Hides/Shows ADDED files
-    [-+]r                  Hides/Shows REMOVED files
-    [-+]m                  Hides/Shows MODIFIED files
-    [-+]n                  Hides/Shows NEWER files
-    [-+]o                  Hides/Shows OLDER files
+    [-+]s                  Hides/Shows SAME files       %s
+    [-+]a                  Hides/Shows ADDED files      %s
+    [-+]r                  Hides/Shows REMOVED files    %s
+    [-+]m                  Hides/Shows MODIFIED files   %s or %s
+    [-+]n                  Hides/Shows NEWER files      %s
+    [-+]o                  Hides/Shows OLDER files      %s
 
 
 
   Note that by default, checkin and checkout operation never remove files, they
   only add or update files.
 
-""" % (__version__)
+""" % (__version__, SAME, ADDED, REMOVED, NEWER, OLDER, NEWER, OLDER)
 
 DEFAULTS = {
 	"sink.mode"       : CONTENT_MODE,
@@ -312,6 +321,8 @@ def run( arguments, runningPath=".", logger=None ):
 	ignore_spaces = config["sink.whitespace"]
 	show          = {}
 
+	if os.environ.get("DIFF"): diff_command = os.environ.get("DIFF")
+
 	# We extract the arguments
 	try:
 		optlist, args = getopt.getopt( arguments, "cthVvld:iarsmno",\
@@ -345,7 +356,9 @@ def run( arguments, runningPath=".", logger=None ):
 		elif opt in ('--only', '--accept','--accepts'):
 			accepts.extend(arg.split("."))
 		elif opt == '-d':
-			diffs.append(int(arg))
+			if arg.find(":") == -1: diff, _dir = int(arg), 0
+			else: diff, _dir = map(int, arg.split(":"))
+			diffs.append((diff, _dir))
 		elif opt == '--diff':
 			diff_command = arg
 		elif opt in ('-a'):
@@ -372,7 +385,7 @@ def run( arguments, runningPath=".", logger=None ):
 		elif arg == "+s":
 			show[SAME] = True
 		elif arg == "+m":
-			show[MODIFIED] = True
+			show[NEWER] = show[OLDER] = True
 		elif arg == "+o":
 			show[OLDER] = True
 		elif arg == "+n":
@@ -428,7 +441,7 @@ def run( arguments, runningPath=".", logger=None ):
 	
 	# We apply the operation
 	if any_changes:
-		if operation == listChanges and diffs:
+		if operation == listChanges:
 			operation( changes, origin_state, compared_states, logger, diffs,
 			diffcommand=diff_command, show=show)
 		else:
@@ -444,4 +457,4 @@ if __name__ == "__main__" :
 	else:
 		run([])
 
-# EOF-Unix/ASCII------------------------------------@RisingSun//Python//1.0//EN
+# EOF

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # Encoding: iso-8859-1
-# vim: ts=4 noet
+# vim: sw=4 ts=4 tw=80 noet fenc=latin-1
 # -----------------------------------------------------------------------------
 # Project           :   Sink         
 # -----------------------------------------------------------------------------
@@ -9,42 +9,8 @@
 # -----------------------------------------------------------------------------
 # Creation date     :   09-Dec-2003
 # Last mod.         :   21-Apr-2006
-# History           :
-#                       21-Apr-2006 Added filters for nodes
-#                       19-Apr-2006 Removed the XML serializer and parser,
-#                       updated signature management, and made tracker use time
-#                       instead of signature by default.
-#                       22-Feb-2006 Ensured that file signature returns
-#                       something
-#                       17-Jan-2006 Some API refactoring (compatibility broken) (SPE)
-#                       19-Dec-2004 Skip list for attributes in signature (SPE)
-#                       03-Dec-2004 Symlinks are skipped (SPE)
-#                       01-Jun-2004 Can delete nodes from changes (SPE)
-#                       25-May-2004 Added `getAbsoluteLocation' (SPE)
-#                       15-May-2004 Renamed Delta to Change (SPE)
-#                       28-Apr-2004 Added tracking attributes (SPE)
-#                       27-Apr-2004 Recorded state snapshot time (SPE)
-#                       05-Apr-2004 Renamed Node to NodeState (SPE)
-#                       21-Jan-2004 Signature is now split into data and
-#                       attributes signatures. (SPE)
-#                       09-Jan-2004 Updated XML serialization. (SPE)
-#                       05-Jan-2004 Prefixed with FileSystem or suffixed with
-#                       NodeState. Added draft XML parser and serialize, updated API
-#                       to enable parser/serializer implementation (SPE)
-#                       30-Dec-2003 Implemented directory, folder and state.
-#                       Added attributes-information support to nodes, added
-#                       ancestor guessing function. (SPE)
-#                       09-Dec-2003 First implementation (SPE)
-#
-# Bugs              :
-#                       - When a directory contains a symbolic link that creates
-#                         a circle (eg /a/b points to /a), the trakcking dies.
-#                         I should add a "sanity check" before tracking changes
-# To do             :
-#                       - Optimize directory update
-#
 # Notes             :
-#                       - NodeStates SHOULD not be created directly, because they
+#                       NodeStates SHOULD not be created directly, because they
 #                       MUST be cached (signature and location) in their
 #                       containing state to be processable by the change
 #                       tracker.
@@ -874,4 +840,4 @@ class Tracker:
 		the new state but is in the old state."""
 		node.tag(event=NodeState.REMOVED)
 
-# EOF-Unix/ASCII------------------------------------@RisingSun//Python//1.0//EN
+# EOF
