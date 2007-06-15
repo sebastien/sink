@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # Encoding: iso-8859-1
-# vim: sw=4 ts=4 tw=80 noet fenc=latin-1
+# vim: sw=4 ts=4 tw=80 noet 
 # -----------------------------------------------------------------------------
 # Project           :   Sink                   <http://sofware.type-z.org/sink>
 # -----------------------------------------------------------------------------
