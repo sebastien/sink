@@ -16,10 +16,10 @@ from os.path import basename, dirname, exists
 # We try to import the sink module. If we have trouble, we simply insert the
 # path into the Python path
 try:
-	from sink import tracking
+	from sink import tracking, linking
 except:
 	sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-	from sink import tracking
+	from sink import tracking, linking
 
 __version__ = "0.9.8"
 
@@ -33,17 +33,36 @@ class Logger:
 	"""A logger instance allows to properly output information to the user
 	through the terminal."""
 
-	def error( self, message ):
-		sys.stderr.write("ERROR   : %s\n" % (message))
+	@staticmethod
+	def default():
+		"""Returnts the default logger instance."""
+		if not hasattr(Logger, "DEFAULT"):
+			Logger.DEFAULT = Logger()
+		return Logger.DEFAULT
 
-	def warning( self, message ):
-		sys.stderr.write("WARNING : %s\n" % (message))
+	def __init__( self ):
+		self._out = sys.stdout
+		self._err = sys.stderr
 
-	def message( self, message ):
-		sys.stdout.write( "%s\n" % (message))
+	def error( self, *message ):
+		self._write(self._err,  "[ERROR]", *message)
+		return -1
 
-	def tip( self, tip ):
-		sys.stdout.write( "TIP:\t%s\n" % (tip))
+	def warning( self, *message ):
+		self._write(self._out, "[!]", *message)
+		return 0
+
+	def message( self, *message ):
+		self._write(self._out, *message)
+		return 0
+
+	def info( self, *message ):
+		self._write(self._out,  *message)
+		return 0
+
+	def _write( self, stream, *a ):
+		stream.write(" ".join(map(str,a)) + "\n")
+		stream.flush()
 
 #------------------------------------------------------------------------------
 #
@@ -83,6 +102,7 @@ DEFAULTS = {
 
 OPERATIONS = {
 	"list":tracking.Engine,
+	"link":linking.Engine,
 	"":tracking.Engine
 }
 
@@ -100,7 +120,7 @@ def run( arguments, runningPath=".", logger=None ):
 
 	# And the logger
 	if logger==None:
-		logger = Logger()
+		logger = Logger.default()
 
 	# TODO: Add a better command/engine integration, where engines have a change
 	# to set defaults, and parse config
@@ -144,10 +164,16 @@ def run( arguments, runningPath=".", logger=None ):
 		return
 	elif args[0] in OPERATIONS.keys():
 		engine = OPERATIONS[args[0]](logger, config)
-		return engine.run(args[1:])
+		try:
+			return engine.run(args[1:])
+		except Exception, e:
+			return logger.error(str(e))
 	else:
 		engine = OPERATIONS[""](logger, config)
-		return engine.run(args)
+		try:
+			return engine.run(args)
+		except Exception, e:
+			return logger.error(str(e))
 
 if __name__ == "__main__" :
 	#import profile
