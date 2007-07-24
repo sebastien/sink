@@ -1,19 +1,19 @@
 #!/usr/bin/env python
 # Encoding: iso-8859-1
-# vim: sw=4 ts=4 tw=80 noet fenc=latin-1
 # -----------------------------------------------------------------------------
-# Project           :   Sink         
+# Project           :   Sink
 # -----------------------------------------------------------------------------
 # Author            :   Sebastien Pierre                 <sebastien@type-z.org>
 # License           :   BSD License (revised)
 # -----------------------------------------------------------------------------
 # Creation date     :   09-Dec-2003
-# Last mod.         :   21-Apr-2006
+# Last mod.         :   24-Jul-2006
 # Notes             :
 #                       NodeStates SHOULD not be created directly, because they
 #                       MUST be cached (signature and location) in their
 #                       containing state to be processable by the change
 #                       tracker.
+# -----------------------------------------------------------------------------
 
 import os, sha, stat, time, fnmatch, xml.dom
 
@@ -32,7 +32,6 @@ UNKNOWN_ELEMENT = "Unknown element %s"
 FILE_SYSTEM_ATTRIBUTES = (
 	"Size", "Creation", "Modification", "Owner", "Group", "Permissions",
 )
-
 
 class NodeState:
 	"""The abstract class for representing the state of filesystem files
@@ -140,7 +139,7 @@ class NodeState:
 		"""Returns the name of this node. This corresponds to the basename of
 		this node location."""
 		return os.path.basename(self.location())
-		
+
 	def getAbsoluteLocation( self ):
 		"""Returns the node location, which implies that the location has been
 		assigned a state."""
@@ -805,9 +804,8 @@ class Tracker:
 		# We make sure that we classified every node of the state
 		assert len(new_locations) + len(prev_locations) + len(same_locations)\
 		== changes.count()
-
 		return changes
-	
+
 	def onCreated( self, node ):
 		"""Handler called when a node was created, ie. it is present in the new
 		state and not in the old one."""
@@ -829,4 +827,299 @@ class Tracker:
 		the new state but is in the old state."""
 		node.tag(event=NodeState.REMOVED)
 
-# EOF
+#------------------------------------------------------------------------------
+#
+#  File system node
+#
+#------------------------------------------------------------------------------
+
+USAGE = """\
+  sink compare [OPTIONS] [OPERATION] ORIGIN COMPARED...
+
+  ORIGIN    is the directory to which we want to compare the others
+  COMPARED  is a list of directories that will be compared to ORIGIN
+
+  Options:
+
+    -c, --content (DEF)    Uses content analysis to detect changes
+    -t, --time             Uses timestamp to detect changes
+    --ignore-spaces        Ignores the spaces when analyzing the content
+    --ignore GLOBS         Ignores the files that match the glob
+    --only   GLOBS         Only accepts the file that match glob
+    --filter PATTERN       Tells which files you want to list
+
+  You can also specify what you want to be listed in the diff:
+
+    [-+]s                  Hides/Shows SAME files       [=]
+    [-+]a                  Hides/Shows ADDED files      [+]
+    [-+]r                  Hides/Shows REMOVED files     !
+    [-+]m                  Hides/Shows MODIFIED files   [>] or [<]
+    [-+]n                  Hides/Shows NEWER files      [>]
+    [-+]o                  Hides/Shows OLDER files      [<]
+
+  PATTERN is a string containing any of the symbols between braces ([?])
+  listed above (eg. --filter '+-<>').
+
+  GLOBS understand '*' and '?', will refer to the basename and can be
+  separated by commas. If a directory matches the glob, it will not be
+  traversed (ex: --ignore '*.pyc,*.bak,.[a-z]*')
+
+""" 
+
+CONTENT_MODE = True
+TIME_MODE    = False
+ADDED        = "[+]"
+REMOVED      = " ! "
+NEWER        = "[>]"
+OLDER        = "[<]"
+SAME         = "[=]"
+ABSENT       = "   "
+
+class Engine:
+	"""Implements operations used by the Sink main command-line interface."""
+
+	def __init__( self, logger, config=None ):
+		self.logger        = logger
+		self.mode          = CONTENT_MODE
+		self.ignore_spaces = True
+		self.rejects       = []
+		self.accepts       = []
+		self.diffs         = []
+		self.show          = {}
+		if config: self.setup(config)
+
+	def setup( self, config ):
+		"""Sets up the engine using the given configuration object."""
+		if os.environ.get("DIFF"): diff_command = os.environ.get("DIFF")
+		self.mode          = config["sink.mode"]
+		self.diff_command  = config["sink.diff"]
+		self.diffs         = []
+		self.accepts       = config["filters.accepts"]
+		self.rejects       = config["filters.rejects"]
+		self.ignore_spaces = config["sink.whitespace"]
+		self.show          = {}
+
+	def run( self, arguments ):
+		"""Runs the command using the given list of arguments (a list of
+		strings)."""
+		logger = self.logger
+		# We extract the arguments
+		try:
+			optlist, args = getopt.getopt( arguments, "cthVvld:iarsmno",\
+			["version", "help", "verbose", "list", "checkin", "checkout",
+			"modified",
+			"time", "content", "ignore-spaces", "ignorespaces", "diff=", "ignore=",
+			"ignores=", "accept=", "accepts=", "only="])
+		except:
+			args    = []
+			optlist = []
+		# We parse the options
+		for opt, arg in optlist:
+			if opt in ('-h', '--help'):
+				print USAGE ; return 0
+			elif opt in ('-v', '--version'):
+				print __version__
+				return 0
+			elif opt in ('-c', '--content'):
+				self.mode   = CONTENT_MODE
+			elif opt in ('-t', '--time'):
+				self.mode = TIME_MODE
+			elif opt in ('--ignorespaces', '--ignore-spaces'):
+				self.ignore_spaces = True
+			elif opt in ('--ignore', '--ignores'):
+				self.rejects.extend(arg.split(","))
+			elif opt in ('--only', '--accept','--accepts'):
+				self.accepts.extend(arg.split("."))
+			elif opt == '-d':
+				if arg.find(":") == -1: diff, _dir = int(arg), 0
+				else: diff, _dir = map(int, arg.split(":"))
+				self.diffs.append((diff, _dir))
+			elif opt == '--diff':
+				self.diff_command = arg
+			elif opt in ('-a'):
+				self.show[ADDED]   = False
+			elif opt in ('-r'):
+				self.show[REMOVED] = False
+			elif opt in ('-s'):
+				self.show[SAME]    = False
+			elif opt in ('-m'):
+				self.show[NEWER]   = False
+				self.show[OLDER]   = False
+			elif opt in ('-n'):
+				self.show[NEWER]   = False
+			elif opt in ('-o'):
+				self.show[OLDER]   = False
+		# We adjust the show
+		nargs = []
+		for arg in args:
+			if   arg == "+a":
+				self.show[ADDED] = True
+			elif arg == "+r":
+				self.show[REMOVED] = True
+			elif arg == "+s":
+				self.show[SAME] = True
+			elif arg == "+m":
+				self.show[NEWER] = self.show[OLDER] = True
+			elif arg == "+o":
+				self.show[OLDER] = True
+			elif arg == "+n":
+				self.show[OLDER] = True
+			else:
+				nargs.append(arg)
+		args = nargs
+
+		# We set the default values for the show, only if there was no + option
+		if self.show == {} or filter(lambda x:not x, self.show.values()):
+			for key,value in { ADDED:True, REMOVED:True, NEWER:True, OLDER:True,
+			SAME:False }.items():
+				self.show.setdefault(key, value)
+		# We ensure that there are enough arguments
+		if len(args) < 2:
+			logger.error("Bad number of arguments\n" + USAGE)
+			return -1
+		origin_path    = args[0]
+		compared_paths = args[1:]
+		# Wensures that the origin and compared directories exist
+		if not os.path.isdir(origin_path):
+			logger.error("Origin directory does not exist.") ; return -1
+		for path in compared_paths:
+			if not os.path.isdir(path):
+				logger.error("Compared directory does not exist.") ; return -1
+
+		# Detects changes between source and destination
+		tracker         = Tracker()
+		origin_state    = State(origin_path, accepts=accepts, rejects=rejects)
+		compared_states = []
+		for path in compared_paths:
+			compared_states.append(State(path, accepts=accepts, rejects=rejects))
+
+		# Scans the source and destination, and updates
+		#logger.message("Scanning origin: " + origin_path)
+		origin_state.populate( lambda x: mode )
+		for state in compared_states:
+			#logger.message("Scanning compared: " + state.location())
+			state.populate(lambda x: mode )
+		changes     = []
+		any_changes = False
+		for state in compared_states:
+			#logger.message("Comparing '%s' to origin" % (state.location()))
+			if mode == CONTENT_MODE:
+				changes.append(tracker.detectChanges(state, origin_state,
+				method=Tracker.SHA1))
+			else:
+				changes.append(tracker.detectChanges(state, origin_state,
+				method=Tracker.TIME))
+			any_changes = changes[-1].anyChanges() or any_changes
+		
+		# We apply the operation
+		if any_changes:
+			self.listChanges(
+				changes, origin_state, compared_states,
+				diffs, diffcommand=diff_command, show=show
+			)
+		else:
+			logger.message("Nothing changed.")
+		return 0
+
+	def usage( self ):
+		return USAGE
+
+	def listChanges( changes, origin, compared, diffs=[], diffcommand="diff", show=None ):
+		"""Outputs a list of changes, with files only in source, fiels only in
+		destination and modified files."""
+		assert show
+		all_locations = []
+		all_locations_keys = {}
+		# We get the locations by changes
+		for change in changes:
+			locations = {}
+			removed   = change.getOnlyInOldState()
+			added     = change.getOnlyInNewState()
+			changed   = change.getModified()
+			unchanged = change.getUnmodified()
+			added.sort(lambda a,b:cmp(a.location(), b.location()))
+			removed.sort(lambda a,b:cmp(a.location(), b.location()))
+			changed.sort(lambda a,b:cmp(a.location(), b.location()))
+			for node in added:
+				if not show.get(ADDED): break
+				if node.isDirectory(): continue
+				all_locations_keys[node.location()] = True
+				locations[node.location()] = ADDED
+			for node in removed:
+				if not show.get(REMOVED): break
+				if node.isDirectory(): continue
+				all_locations_keys[node.location()] = True
+				locations[node.location()] = REMOVED
+			for node in changed:
+				if not show.get(NEWER) or not show.get(OLDER): break
+				if node.isDirectory(): continue
+				all_locations_keys[node.location()] = True
+				old_node = change.previousState.nodeWithLocation(node.location())
+				new_node = change.newState.nodeWithLocation(node.location())
+				if old_node.getAttribute("Modification") < new_node.getAttribute("Modification"):
+					if not show.get(NEWER): continue
+					locations[node.location()] = NEWER
+				else:
+					if not show.get(OLDER): continue
+					locations[node.location()] = OLDER
+			for node in unchanged:
+				if not show.get(SAME): break
+				if node.isDirectory(): continue
+				all_locations_keys[node.location()] = True
+				locations[node.location()] = SAME
+			all_locations.append(locations)
+		# Now we print the result
+		all_locations_keys = all_locations_keys.keys()
+		all_locations_keys.sort(lambda a,b:cmp((a.count("/"),a),(b.count("/"), b)))
+		format  = "%0" + str(len(str(len(all_locations_keys))) ) + "d %s %s"
+		counter = 0
+		def find_diff( num ):
+			for _diff, _dir in diffs:
+				if _diff == num: return _dir
+			return None
+		for loc in all_locations_keys:
+			# For the origin, the node is either ABSENT or SAME
+			if origin.nodeWithLocation(loc) == None:
+				state = ABSENT
+			else:
+				state = SAME
+			# For all locations
+			for locations in all_locations:
+				node = locations.get(loc)
+				if node == None:
+					if origin.nodeWithLocation(loc) == None:
+						state += ABSENT
+					else:
+						state += SAME
+				else:
+					state += node
+			self.logger.message(format % (counter, state, loc))
+			found_diff = find_diff(counter)
+			if found_diff != None:
+				src = origin.nodeWithLocation(loc)
+				found_diff -= 1
+				if found_diff == -1:
+					self.logger.message("Given DIR is too low, using 1 as default")
+					found_diff = 0
+				if found_diff >= len(compared):
+					self.logger.message("Given DIR is too high, using %s as default" % (len(compared)))
+					found_diff = len(compared)-1
+				dst = compared[found_diff-1].nodeWithLocation(loc)
+				if not src:
+					self.logger.message("Cannot diff\nFile only in dest:   " + dst.getAbsoluteLocation())
+				elif not dst:
+					self.logger.message("Cannot diff\nFile only in source: " + src.getAbsoluteLocation())
+				else:
+					src = src.getAbsoluteLocation()
+					dst = dst.getAbsoluteLocation()
+					self.logger.message("Diff: '%s' --> '%s'" % (src,dst))
+					command = '%s %s %s' % ( diffcommand,src,dst)
+					os.system(command)
+			counter += 1
+		# if added:     self.logger.message( "\t%5s were added    [+]" % (len(added)))
+		# if removed:   self.logger.message( "\t%5s were removed   ! " % (len(removed)))
+		# if changed:   self.logger.message( "\t%5s were modified [>]" % (len(changed)))
+		# if unchanged: self.logger.message( "\t%5s are the same  [=]" % (len(unchanged)))
+		if not all_locations_keys: self.logger.message("No changes found.")
+
+# EOF - vim: sw=4 ts=4 tw=80 noet
