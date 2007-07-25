@@ -7,12 +7,12 @@
 # License           :   BSD License (revised)
 # -----------------------------------------------------------------------------
 # Creation date     :   23-Jul-2006
-# Last mod.         :   24-Jul-2006
+# Last mod.         :   25-Jul-2006
 # -----------------------------------------------------------------------------
 
 # TODO: Make it standalone (so it can be intergrated into Mercurial Contrib)
 
-import os, sys, sha, stat, getopt
+import os, sys, sha, stat, getopt, shutil
 
 #------------------------------------------------------------------------------
 #
@@ -49,7 +49,7 @@ def path_is_child( path, parent ):
 	e_parent = expand_path(parent)
 	return e_path.startswith(e_parent)
 
-def make_relative( path, relative_to ):
+def make_relative( path, relative_to="." ):
 	"""Expresses the given 'path' relatively to the 'relative_to' path."""
 	path, relative_to = map(expand_path, (path, relative_to))
 	if path.startswith(relative_to):
@@ -153,6 +153,16 @@ class LinksCollection:
 		self.links[n_destination] = source
 		return e_destination, source
 
+	def removeLink( self, link, delete=False ):
+		"""Removes the link from this link collection. The file is only delete
+		if the delete option is True."""
+		assert self.getSource(link)
+		e_link = expand_path(link)
+		n_link = self._normalizeDestination(e_link)
+		if delete and os.path.exists(e_link):
+			os.unlink(e_link)
+		del self.links[n_link]
+
 	def save( self ):
 		"""Saves the link collection to the 'dbpath()' file."""
 		f = file(self.dbpath(), 'w')
@@ -250,11 +260,29 @@ USAGE = """\
 
   sink link update [OPTIONS] [PATH|LINK]...
 
+     Updates the given links in the current or given PATH, or updates only the
+     given list of LINKs (they must belong to the same link DB, accessible from
+     the current path).
+
+     If the link is newer than the source and has modifications, then the update
+     will not happen unless it is --force'd.
+
+     You can also merge back the changes by using '--merge'. This will start
+     your favorite $MERGETOOL.
 
      Options:
 
        -f, --force       Forces the update, ignoring local modifications
        -m, --merge       Uses the $MERGETOOL to merge the link source and dest
+
+  sink link remove LINK [LINK..]
+
+      Removes one or more link from the link database. The links destinations
+      won't be removed from the filesystem unlesse you specify '--delete'.
+
+      Options:
+
+        -d, --delete      Deletes the link destination (your local file)
 
 """
 
@@ -299,13 +327,13 @@ class Engine:
 		elif command == "add":
 			try:
 				optlist, args = getopt.getopt( rest, "w", ["writable"])
-			except:
-				args    = []
-				optlist = []
+			except Exception, e:
+				return self.logger.error(e)
 			self.linksReadOnly = True
 			for opt, arg in optlist:
 				if opt in ('-w', '--writable'):
 					self.linksReadOnly = False
+					raise Exception("--writable not implemented yet")
 			if len(args) != 2:
 				return self.logger.error("Adding a link requires a SOURCE and DESTINATION")
 			collection = LinksCollection.lookup(".") or LinksCollection(".")
@@ -314,6 +342,34 @@ class Engine:
 		elif command == "status":
 			collection = LinksCollection.lookup(".") or LinksCollection(".")
 			self.status(collection)
+		# -- REMOVE command
+		elif command == "update":
+			try:
+				optlist, args = getopt.getopt( rest, "fm", ["force", "merge"])
+			except Exception, e:
+				return self.logger.error(e)
+			self.forceUpdate = False
+			for opt, arg in optlist:
+				if opt in ('-f', '--force'):
+					self.forceUpdate = True
+				if opt in ('-m', '--merge'):
+					raise Exception("--merge option not implemented yet")
+			collection = LinksCollection.lookup(".") or LinksCollection(".")
+			self.update(collection, *args)
+		# -- REMOVE command
+		elif command == "remove":
+			try:
+				optlist, args = getopt.getopt( rest, "d", ["delete"])
+			except Exception, e:
+				return self.logger.error(e)
+			delete = False
+			for opt, arg in optlist:
+				if opt in ('-d', '--delete'):
+					delete = True
+			if not args:
+				return self.logger.error("At least one link is expected")
+			collection = LinksCollection.lookup(".") or LinksCollection(".")
+			self.remove(collection, args, delete)
 		else:
 			return self.logger.error("Uknown command: %s" % (command))
 
@@ -364,20 +420,50 @@ class Engine:
 			link_max = max(len(l), link_max) 
 			src_max  = max(len(s), src_max)
 			links.append([s, l])
+		links.sort()
 		template = "%-" + str(link_max) + "s  %s  %" + str(src_max) + "s  [%s]"
 		for s, l in links:
 			content, date = self.linkStatus(collection, l)
 			self.logger.message(template % (l,date,s,content))
 
-	def update( self, collection ):
-		for s, l in collection.getLinks():
+	def update( self, collection, *links ):
+		"""Updates the given links, or all if no link is specified."""
+		col_links = collection.getLinks()
+		dst_links = map(lambda x:x[1], col_links)
+		if not col_links:
+			return self.logger.warning("No link registered in the collection")
+		links = map(expand_path, links)
+		# We make sure that the link are registered
+		for link in links:
+			if not link in dst_links:
+				return self.logger.error("Link is not registered: %s" % (
+					make_relative(link, ".")
+				))
+		# Then we update the links
+		for s, l in col_links:
 			content, date = self.linkStatus(collection, l)
+			# We ignore the links that are not in the 'links' list, if this list
+			# is not empty
+			if links and not (l in links):
+				continue
 			if content == self.ST_NOT_THERE or content == self.ST_EMPTY \
 			or content == self.ST_DIFFERENT and date != self.ST_NEWER:
 				self.logger.message("Updating ", make_relative(l,"."))
-				self.updateLink(l)
+				self.updateLink(collection, l)
 			elif content == self.ST_DIFFERENT:
 				self.logger.warning("Skipping update", make_relative(l,"."), "(file has local modifications)")
+			else:
+				self.logger.message("Link is up to date: ", make_relative(l,"."))
+
+	def remove( self, collection, links, delete=False ):
+		"""Remove the given list of links from the collection."""
+		for link in links:
+			if not collection.getSource(link):
+				return self.logger.error("Link does not exist: %s" % (make_relative(link)))
+		for link in links:
+			self.logger.message("Removing link: %s" % (make_relative(link)))
+			collection.removeLink(link, delete)
+		collection.save()
 
 	def linkStatus( self, collection, link ):
 		"""Returns a couple '(CONTENT_STATUS, FILE_STATUS)' where
@@ -402,15 +488,15 @@ class Engine:
 		if s_tme > d_tme: res_1 = self.ST_OLDER
 		return (res_0, res_1)
 
-	def updateLink( self, link, force=False ):
+	def updateLink( self, collection, link, force=False ):
 		"""Updates the given link to the content of the link source"""
-		c, d = self.linkStatus(link)
+		c, d = self.linkStatus(collection, link)
 		if not force and (not (c in (self.ST_EMPTY, self.ST_NOT_THERE)) and d != self.ST_SAME):
 			raise RuntimeError(ENG_LINK_IS_NEWER % (link))
 		e_link = expand_path(link)
 		assert os.path.exists(e_link)
 		f = file(e_link, 'w')
-		_, content = self.resolveLink(e_link)
+		_, content = self.resolveLink(collection, e_link)
 		f.write(content)
 		f.close()
 
