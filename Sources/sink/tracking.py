@@ -8,14 +8,14 @@
 # -----------------------------------------------------------------------------
 # Creation date     :   09-Dec-2003
 # Last mod.         :   24-Jul-2006
-# Notes             :
-#                       NodeStates SHOULD not be created directly, because they
+# -----------------------------------------------------------------------------
+# Notes             :   NodeStates SHOULD not be created directly, because they
 #                       MUST be cached (signature and location) in their
 #                       containing state to be processable by the change
 #                       tracker.
 # -----------------------------------------------------------------------------
 
-import os, sha, stat, time, fnmatch, xml.dom
+import os, sha, stat, time, fnmatch, getopt
 
 # Error messages
 
@@ -890,7 +890,7 @@ class Engine:
 
 	def setup( self, config ):
 		"""Sets up the engine using the given configuration object."""
-		if os.environ.get("DIFF"): diff_command = os.environ.get("DIFF")
+		if os.environ.get("DIFF"): self.diff_command = os.environ.get("DIFF")
 		self.mode          = config["sink.mode"]
 		self.diff_command  = config["sink.diff"]
 		self.diffs         = []
@@ -902,7 +902,12 @@ class Engine:
 	def run( self, arguments ):
 		"""Runs the command using the given list of arguments (a list of
 		strings)."""
-		logger = self.logger
+		logger   = self.logger
+		accepts  = self.accepts
+		rejects  = self.rejects
+		show     = self.show
+		diffs    = self.diffs
+		command, arguments = arguments[0], arguments[1:]
 		# We extract the arguments
 		try:
 			optlist, args = getopt.getopt( arguments, "cthVvld:iarsmno",\
@@ -910,9 +915,8 @@ class Engine:
 			"modified",
 			"time", "content", "ignore-spaces", "ignorespaces", "diff=", "ignore=",
 			"ignores=", "accept=", "accepts=", "only="])
-		except:
-			args    = []
-			optlist = []
+		except Exception, e:
+			return self.logger.error(e)
 		# We parse the options
 		for opt, arg in optlist:
 			if opt in ('-h', '--help'):
@@ -995,15 +999,15 @@ class Engine:
 
 		# Scans the source and destination, and updates
 		#logger.message("Scanning origin: " + origin_path)
-		origin_state.populate( lambda x: mode )
+		origin_state.populate( lambda x: self.mode )
 		for state in compared_states:
 			#logger.message("Scanning compared: " + state.location())
-			state.populate(lambda x: mode )
+			state.populate(lambda x: self.mode )
 		changes     = []
 		any_changes = False
 		for state in compared_states:
 			#logger.message("Comparing '%s' to origin" % (state.location()))
-			if mode == CONTENT_MODE:
+			if self.mode == CONTENT_MODE:
 				changes.append(tracker.detectChanges(state, origin_state,
 				method=Tracker.SHA1))
 			else:
@@ -1015,7 +1019,7 @@ class Engine:
 		if any_changes:
 			self.listChanges(
 				changes, origin_state, compared_states,
-				diffs, diffcommand=diff_command, show=show
+				diffs, diffcommand=self.diff_command, show=show
 			)
 		else:
 			logger.message("Nothing changed.")
@@ -1024,7 +1028,7 @@ class Engine:
 	def usage( self ):
 		return USAGE
 
-	def listChanges( changes, origin, compared, diffs=[], diffcommand="diff", show=None ):
+	def listChanges( self, changes, origin, compared, diffs=[], diffcommand="diff", show=None ):
 		"""Outputs a list of changes, with files only in source, fiels only in
 		destination and modified files."""
 		assert show
