@@ -10,6 +10,8 @@
 # Last mod.         :   24-Jul-2006
 # -----------------------------------------------------------------------------
 
+# TODO: Make it standalone (so it can be intergrated into Mercurial Contrib)
+
 import os, sys, sha, stat, getopt
 
 #------------------------------------------------------------------------------
@@ -32,7 +34,7 @@ ENG_LINK_IS_NEWER = "Link is newer, update has to be forced: %s"
 
 #------------------------------------------------------------------------------
 #
-#  Basic operations
+#  Basic path operations
 #
 #------------------------------------------------------------------------------
 
@@ -48,19 +50,14 @@ def path_is_child( path, parent ):
 	return e_path.startswith(e_parent)
 
 def make_relative( path, relative_to ):
+	"""Expresses the given 'path' relatively to the 'relative_to' path."""
 	path, relative_to = map(expand_path, (path, relative_to))
 	if path.startswith(relative_to):
 		path = path[len(relative_to):]
-		if path[0] == "/": path = path[1:]
+		if path and path[0] == "/": path = path[1:]
 		return path
 	else:
 		return path
-
-#------------------------------------------------------------------------------
-#
-#  LinksCollection Class
-#
-#------------------------------------------------------------------------------
 
 def has_hg( path ):
 	"""Returns the path of the (possible) Mercurial repository contained at the
@@ -76,6 +73,15 @@ def has_hg( path ):
 	else:
 		return None
 
+#------------------------------------------------------------------------------
+#
+#  LinksCollection Class
+#
+#------------------------------------------------------------------------------
+
+DB_FILE    = ".sink-links"
+DB_FILE_HG = os.path.join(".hg", "sink-links")
+
 class LinksCollection:
 
 	@staticmethod
@@ -85,29 +91,27 @@ class LinksCollection:
 		if not path: return None
 		path = os.path.abspath(path)
 		parent = os.path.dirname(path)
-		fs_vlinks = os.path.join(path, ".sink-links")
-		hg_vlinks = os.path.join(path, ".hg/sink-links")
+		fs_vlinks = os.path.join(path, DB_FILE)
+		hg_vlinks = os.path.join(path, DB_FILE_HG)
 		if os.path.exists(fs_vlinks):
-			return LinksCollection(fs_vlinks, fullPath=True)
+			return LinksCollection(path, DB_FILE)
 		elif os.path.exists(hg_vlinks):
-			return LinksCollection(hg_vlinks, fullPath=True)
+			return LinksCollection(path, DB_FILE_HG)
 		elif parent != path:
 			return LinksCollection.lookup(parent)
 		else:
 			return None
 
-	def __init__( self, root, fullPath=False ):
+	def __init__( self, root, dbfile=DB_FILE ):
 		"""Creates a new link collection object, using the given root."""
 		self.links = {}
 		root  = expand_path(root)
 		if not os.path.exists(root):
 			raise LinksCollectionError(CFG_BAD_ROOT)
-		if not fullPath:
-			if root.endswith(".hg"):
-				root = os.path.join(root, "sink-links")
-			else:
-				root = os.path.join(root, ".sink-links")
-		self.root = root
+		self.root   = root
+		self.dbfile = dbfile
+		if self.exists():
+			self.load()
 
 	def getLinks( self ):
 		"""Returns a list of '(source, dest)' where source and dest are absolute
@@ -150,19 +154,51 @@ class LinksCollection:
 		return e_destination, source
 
 	def save( self ):
-		f = file(self.root, 'w')
+		"""Saves the link collection to the 'dbpath()' file."""
+		f = file(self.dbpath(), 'w')
 		f.write(str(self))
 		f.close()
 
+	def load( self ):
+		"""Loads the given collection."""
+		f = file(self.dbpath(), 'r')
+		c = f.readlines()
+		f.close()
+		links_count = 0
+		for line in c: 
+			line = line[:-1]
+			line = line.strip()
+			if not line: continue
+			if line.startswith("#"): continue
+			elements = line.split("\t")
+			command, args = elements[0], elements[1:]
+			command = command.strip()[:-1]
+			if   command == "dbfile":
+				# TODO: Check that the dbfile has the same value
+				pass
+			elif command == "root":
+				# TODO: Check that root has the same value
+				pass
+			elif command == "links":
+				links_count = int(args[0])
+			elif command == "link":
+				self.links[args[0]] = args[1]
+		assert len(self.links.items()) == links_count
+
+	def dbpath( self ):
+		"""Returns the absolute patht ot the DB file."""
+		return expand_path(os.path.join(self.root, self.dbfile))
+
 	def exists( self ):
 		"""Tells if the collection exists on the filesystem."""
-		return os.path.exists(self.root)
+		return os.path.exists(self.dbpath())
 
 	def __str__( self ):
 		"""Serializes the collection to a string"""
 		res = []
 		res.append("# Sink Link Database")
 		res.append("root:\t%s" % (self.root))
+		res.append("dbfile:\t%s" % (self.dbfile))
 		res.append("links:\t%s" % (len(self.links)))
 		for d,s in self.links.items():
 			res.append("link:\t%s\t%s" % (d,s))
@@ -228,7 +264,7 @@ class Engine:
 
 	ST_SAME      = "="
 	ST_DIFFERENT = "!"
-	ST_EMPTY     = "-"
+	ST_EMPTY     = "!"
 	ST_NOT_THERE = "?"
 	ST_NEWER     = ">"
 	ST_OLDER     = "<"
@@ -272,8 +308,14 @@ class Engine:
 					self.linksReadOnly = False
 			if len(args) != 2:
 				return self.logger.error("Adding a link requires a SOURCE and DESTINATION")
-			collection = LinksCollection.lookup(".") or LinksCollection()
+			collection = LinksCollection.lookup(".") or LinksCollection(".")
 			self.add(collection, args[0], args[1])
+		# -- STATUS command
+		elif command == "status":
+			collection = LinksCollection.lookup(".") or LinksCollection(".")
+			self.status(collection)
+		else:
+			return self.logger.error("Uknown command: %s" % (command))
 
 	def init( self, path="." ):
 		"""Initializes a link collection (link db) at the given location."""
@@ -284,56 +326,65 @@ class Engine:
 		if hg_path:
 			path = hg_path
 		collection = LinksCollection(path)
-		if os.path.exists(collection.root):
-			return self.logger.error("Link database already exists: ", collection.root)
+		if collection.exists():
+			return self.logger.error("Link database already exists: ", make_relative(collection.dbpath(), "."))
 		collection.save()
-		self.logger.info("Link database created: ", make_relative(collection.root, "."))
+		self.logger.info("Link database created: ", make_relative(collection.dbpath(), "."))
 		return collection
 
 	def add( self, collection, source, destination ):
 		"""Adds a link from the source to the destination"""
 		self.logger.message("Adding a link from %s to %s" % (source, destination))
 		if not collection.exists():
-			return self.logger.error("Collection was not initialized: %s" % (collection.root))
-		destination = collection.registerLink(source, destination)
+			return self.logger.error("Link database was not initialized: %s" % (collection.root))
+		exists = collection.getSource(destination)
+		destination, source = collection.registerLink(source, destination)
 		# TODO: Remove the WRITABLE mode from the destinatino
 		if not os.path.exists(destination):
 			self.logger.info("File does not exist, creating it")
+			dirname = os.path.dirname(destination)
+			if not os.path.exists(dirname):
+				self.logger.info("Parent directory does not exist, creating it: %s" %( make_relative(dirname, ".")))
+				os.makedirs(dirname)
 			f = file(destination, "w")
 			f.write("")
 			f.close()
-		collection.write()
+		if exists == source:
+			self.logger.info("Link source is the same as the existing one: %s" % (make_relative(exists, ".")))
+		elif exists:
+			self.logger.warning("Previous link source was replaced: %s" % (make_relative(exists, ".")))
+		collection.save()
 
-	def status( self ):
+	def status( self, collection ):
 		links    = []
 		link_max = 0
 		src_max  = 0
-		for s, l in self.collection.getLinks():
+		for s, l in collection.getLinks():
 			l = make_relative(l, ".")
 			link_max = max(len(l), link_max) 
 			src_max  = max(len(s), src_max)
 			links.append([s, l])
 		template = "%-" + str(link_max) + "s  %s  %" + str(src_max) + "s  [%s]"
 		for s, l in links:
-			content, date = self.linkStatus(l)
+			content, date = self.linkStatus(collection, l)
 			self.logger.message(template % (l,date,s,content))
 
-	def update( self=None ):
-		for s, l in self.collection.getLinks():
-			content, date = self.linkStatus(l)
+	def update( self, collection ):
+		for s, l in collection.getLinks():
+			content, date = self.linkStatus(collection, l)
 			if content == self.ST_NOT_THERE or content == self.ST_EMPTY \
 			or content == self.ST_DIFFERENT and date != self.ST_NEWER:
 				self.logger.message("Updating ", make_relative(l,"."))
 				self.updateLink(l)
 			elif content == self.ST_DIFFERENT:
-				self.logger.warn("Skipping update", make_relative(l,"."), "(file has local modifications)")
+				self.logger.warning("Skipping update", make_relative(l,"."), "(file has local modifications)")
 
-	def linkStatus( self, link ):
+	def linkStatus( self, collection, link ):
 		"""Returns a couple '(CONTENT_STATUS, FILE_STATUS)' where
 		'CONTENT_STATUS' is any of 'ST_SAME, ST_DIFFERENT', 'ST_EMPTY',
 		'ST_NOT_THERE' and 'FILE_STATUS' is any of 'ST_SAME, ST_NEWER,
 		ST_OLDER'."""
-		source = self.collection.getSource(link)
+		source = collection.getSource(link)
 		if not source: raise RuntimeError(ENG_SOURCE_NOT_FOUND % (source))
 		source, s_content = self._read(source)
 		if not os.path.exists(link):
@@ -363,12 +414,12 @@ class Engine:
 		f.write(content)
 		f.close()
 
-	def resolveLink( self, link ):
+	def resolveLink( self, collection, link ):
 		"""Returns ta coupel ('path', 'content') corresponding to the resolution
 		of the given link.
 		
 		The return value is the same as the '_read' method."""
-		source = self.collection.getSource(link)
+		source = collection.getSource(link)
 		return self._read(source)
 
 	def _read( self, path, getContent=True ):

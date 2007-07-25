@@ -144,7 +144,7 @@ doc: $(DOCS)
 
 $(API): $(SOURCE_FILES)
 ifeq ($(shell basename spam/$(SDOC)),sdoc)
-	@echo $(SDOC) -cp$(SOURCES) $(MODULES) $(API)
+	@$(SDOC) -cp$(SOURCES) $(MODULES) $(API)
 else
 	@echo "Sdoc is required to generate $(PROJECT) documentation."
 	@echo "Please see <http://www.ivy.fr/sdoc>"

@@ -164,16 +164,18 @@ def run( arguments, runningPath=".", logger=None ):
 		return
 	elif args[0] in OPERATIONS.keys():
 		engine = OPERATIONS[args[0]](logger, config)
-		try:
-			return engine.run(args[1:])
-		except Exception, e:
-			return logger.error(str(e))
+		return engine.run(args[1:])
+		#try:
+		#	return engine.run(args[1:])
+		#except Exception, e:
+		#	return logger.error(str(e))
 	else:
 		engine = OPERATIONS[""](logger, config)
-		try:
-			return engine.run(args)
-		except Exception, e:
-			return logger.error(str(e))
+		return engine.run(args)
+		#try:
+		#	return engine.run(args)
+		#except Exception, e:
+		#	return logger.error(str(e))
 
 if __name__ == "__main__" :
 	#import profile
