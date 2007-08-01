@@ -6,8 +6,8 @@
 # Author            :   Sebastien Pierre                 <sebastien@type-z.org>
 # License           :   BSD License (revised)
 # -----------------------------------------------------------------------------
-# Creation date     :   23-Jul-2006
-# Last mod.         :   25-Jul-2006
+# Creation date     :   23-Jul-2007
+# Last mod.         :   01-Aug-2007
 # -----------------------------------------------------------------------------
 
 # TODO: Make it standalone (so it can be intergrated into Mercurial Contrib)
@@ -380,8 +380,9 @@ class Engine:
 		if not os.path.exists(path) and (hg_path and not os.path.exists(hg_path)):
 			return self.logger.error("Given path does not exist: %s" % (path))
 		if hg_path:
-			path = hg_path
-		collection = LinksCollection(path)
+			collection = LinksCollection(os.path.dirname(hg_path), DB_FILE_HG)
+		else:
+			collection = LinksCollection(path, DB_FILE)
 		if collection.exists():
 			return self.logger.error("Link database already exists: ", make_relative(collection.dbpath(), "."))
 		collection.save()
@@ -494,14 +495,12 @@ class Engine:
 		if not force and (not (c in (self.ST_EMPTY, self.ST_NOT_THERE)) and d != self.ST_SAME):
 			raise RuntimeError(ENG_LINK_IS_NEWER % (link))
 		e_link = expand_path(link)
-		assert os.path.exists(e_link)
-		f = file(e_link, 'w')
-		_, content = self.resolveLink(collection, e_link)
-		f.write(content)
-		f.close()
+		path, content = self.resolveLink(collection, e_link)
+		shutil.copyfile(path,e_link)
+		shutil.copystat(path,e_link)
 
 	def resolveLink( self, collection, link ):
-		"""Returns ta coupel ('path', 'content') corresponding to the resolution
+		"""Returns ta couple ('path', 'content') corresponding to the resolution
 		of the given link.
 		
 		The return value is the same as the '_read' method."""
