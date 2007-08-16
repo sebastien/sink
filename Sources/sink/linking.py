@@ -29,7 +29,7 @@ class RuntimeError(Exception):
 CFG_BAD_ROOT = "Directory or symlink expected for collection root"
 CFG_NOT_A_CHILD = "Link destination must be a subpath of %s"
 ENG_NOT_FOUND = "Path does not exist: %s"
-ENG_SOURCE_NOT_FOUND = "Link source not found: %s"
+ENG_SOURCE_NOT_FOUND = "Link source for '%s' found: %s"
 ENG_LINK_IS_NEWER = "Link is newer, update has to be forced: %s"
 
 #------------------------------------------------------------------------------
@@ -424,8 +424,11 @@ class Engine:
 		links.sort()
 		template = "%-" + str(link_max) + "s  %s  %" + str(src_max) + "s  [%s]"
 		for s, l in links:
-			content, date = self.linkStatus(collection, l)
-			self.logger.message(template % (l,date,s,content))
+			try:
+				content, date = self.linkStatus(collection, l)
+				self.logger.message(template % (l,date,s,content))
+			except Exception, e:
+				self.logger.error(e)
 
 	def update( self, collection, *links ):
 		"""Updates the given links, or all if no link is specified."""
@@ -472,7 +475,8 @@ class Engine:
 		'ST_NOT_THERE' and 'FILE_STATUS' is any of 'ST_SAME, ST_NEWER,
 		ST_OLDER'."""
 		source = collection.getSource(link)
-		if not source: raise RuntimeError(ENG_SOURCE_NOT_FOUND % (source))
+		if not source or not os.path.exists(source):
+			raise RuntimeError(ENG_SOURCE_NOT_FOUND % (link, source))
 		source, s_content = self._read(source)
 		if not os.path.exists(link):
 			return (self.ST_NOT_THERE, self.ST_NEWER)
