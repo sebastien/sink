@@ -406,6 +406,7 @@ class Engine:
 				self.logger.info("Parent directory does not exist, creating it: %s" %( make_relative(dirname, ".")))
 				os.makedirs(dirname)
 			f = file(destination, "w")
+			# FIXME: Update the link
 			f.write("")
 			f.close()
 		if exists == source:

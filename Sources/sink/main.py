@@ -151,6 +151,8 @@ def run( arguments, runningPath=".", logger=None ):
 					config["filters.accepts"].extend(map(string.strip, val.split(",")))
 				elif key in ("filters.rejects", "filters.reject", "filters.ignore", "filters.ignores"):
 					config["filters.rejects"].extend(map(string.strip, val.split(",")))
+				elif key == "sink.diff":
+					config[key] = val.strip()
 				else:
 					print "Invalid configuration option:", key
 

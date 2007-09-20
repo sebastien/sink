@@ -833,6 +833,7 @@ class Tracker:
 #
 #------------------------------------------------------------------------------
 
+#TODO: Describe -d option
 USAGE = """\
   sink compare [OPTIONS] [OPERATION] ORIGIN COMPARED...
 
