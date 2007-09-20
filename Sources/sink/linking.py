@@ -7,7 +7,7 @@
 # License           :   BSD License (revised)
 # -----------------------------------------------------------------------------
 # Creation date     :   23-Jul-2007
-# Last mod.         :   01-Aug-2007
+# Last mod.         :   20-Sep-2007
 # -----------------------------------------------------------------------------
 
 # TODO: Make it standalone (so it can be intergrated into Mercurial Contrib)
@@ -391,6 +391,8 @@ class Engine:
 
 	def add( self, collection, source, destination ):
 		"""Adds a link from the source to the destination"""
+		if os.path.isdir(destination):
+			destination = os.path.join(destination, os.path.basename(source))
 		self.logger.message("Adding a link from %s to %s" % (source, destination))
 		if not collection.exists():
 			return self.logger.error("Link database was not initialized: %s" % (collection.root))

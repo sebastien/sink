@@ -10,6 +10,17 @@
   - By comparing actual files in real time (implies that the nodestate can be
 	extracted directly from the FS).
 
+Compare
+=======
+
+>	sink compare Sources/python Build/ 
+>	18    [+] lambdafactory/pnuts.pyc
+>	19 [=][<] lambdafactory/python.py
+>	20    [+] lambdafactory/python.pyc
+>	21    [+] lambdafactory/reporter.pyc
+
+>	sink compare --update=19 Sources/python Build
+
 Tracking
 ========
 
