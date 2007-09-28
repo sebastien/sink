@@ -28,9 +28,9 @@ class RuntimeError(Exception):
 
 CFG_BAD_ROOT = "Directory or symlink expected for collection root"
 CFG_NOT_A_CHILD = "Link destination must be a subpath of %s"
-ENG_NOT_FOUND = "Path does not exist: %s"
-ENG_SOURCE_NOT_FOUND = "Link source for '%s' found: %s"
-ENG_LINK_IS_NEWER = "Link is newer, update has to be forced: %s"
+ERR_NOT_FOUND = "Path does not exist: %s"
+ERR_SOURCE_NOT_FOUND = "Link source for '%s' not found: %s"
+ERR_LINK_IS_NEWER = "Link is newer, update has to be forced: %s"
 
 #------------------------------------------------------------------------------
 #
@@ -406,8 +406,7 @@ class Engine:
 				self.logger.info("Parent directory does not exist, creating it: %s" %( make_relative(dirname, ".")))
 				os.makedirs(dirname)
 			f = file(destination, "w")
-			# FIXME: Update the link
-			f.write("")
+			f.write(self._readLocal(source))
 			f.close()
 		if exists == source:
 			self.logger.info("Link source is the same as the existing one: %s" % (make_relative(exists, ".")))
@@ -425,11 +424,12 @@ class Engine:
 			src_max  = max(len(s), src_max)
 			links.append([s, l])
 		links.sort()
-		template = "%-" + str(link_max) + "s  %s  %" + str(src_max) + "s  [%s]"
+		template = "[%s] %-" + str(link_max) + "s  %-s  %" + str(src_max) + "s"
 		for s, l in links:
 			try:
 				content, date = self.linkStatus(collection, l)
-				self.logger.message(template % (l,date,s,content))
+				if content == self.ST_EMPTY: date = self.ST_OLDER
+				self.logger.message(template % (content, l,date,s))
 			except Exception, e:
 				self.logger.error(e)
 
@@ -469,7 +469,7 @@ class Engine:
 				return self.logger.error("Link does not exist: %s" % (make_relative(link)))
 		for link in links:
 			self.logger.message("Removing link: %s" % (make_relative(link)))
-			collection.removeLink(link, delete)
+			collection.removeLink(expand_path(link), delete)
 		collection.save()
 
 	def linkStatus( self, collection, link ):
@@ -478,15 +478,16 @@ class Engine:
 		'ST_NOT_THERE' and 'FILE_STATUS' is any of 'ST_SAME, ST_NEWER,
 		ST_OLDER'."""
 		source = collection.getSource(link)
-		if not source or not os.path.exists(source):
-			raise RuntimeError(ENG_SOURCE_NOT_FOUND % (link, source))
-		source, s_content = self._read(source)
+		source_path = expand_path(source)
+		if not source_path or not os.path.exists(source_path):
+			raise RuntimeError(ERR_SOURCE_NOT_FOUND % (link, source))
+		source_path, s_content = self._read(source_path)
 		if not os.path.exists(link):
 			return (self.ST_NOT_THERE, self.ST_NEWER)
 		dest,   d_content = self._read(link)
 		s_sig = self._sha(s_content)
 		d_sig = self._sha(d_content)
-		s_tme = self._mtime(source)
+		s_tme = self._mtime(source_path)
 		d_tme = self._mtime(dest)
 		res_0 = self.ST_DIFFERENT
 		if s_sig == d_sig: res_0 = self.ST_SAME
@@ -500,7 +501,7 @@ class Engine:
 		"""Updates the given link to the content of the link source"""
 		c, d = self.linkStatus(collection, link)
 		if not force and (not (c in (self.ST_EMPTY, self.ST_NOT_THERE)) and d != self.ST_SAME):
-			raise RuntimeError(ENG_LINK_IS_NEWER % (link))
+			raise RuntimeError(ERR_LINK_IS_NEWER % (link))
 		e_link = expand_path(link)
 		path, content = self.resolveLink(collection, e_link)
 		shutil.copyfile(path,e_link)
@@ -512,7 +513,7 @@ class Engine:
 		
 		The return value is the same as the '_read' method."""
 		source = collection.getSource(link)
-		return self._read(source)
+		return self._read(expand_path(source))
 
 	def _read( self, path, getContent=True ):
 		"""Resolves the given path and returns a couple '(path, content)' when
@@ -520,7 +521,7 @@ class Engine:
 		content of the file when invoked."""
 		path = expand_path(path)
 		if not os.path.exists(path):
-			raise RuntimeError(ENG_NOT_FOUND % (path))
+			raise RuntimeError(ERR_NOT_FOUND % (path))
 		if getContent:
 			return (path, self._readLocal(path))
 		else:
@@ -528,7 +529,7 @@ class Engine:
 
 	def _readLocal( self, path ):
 		"""Reads a file from the local file system."""
-		f = file(path, 'r')
+		f = file(expand_path(path), 'r')
 		c = f.read()
 		f.close()
 		return c
