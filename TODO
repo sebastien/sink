@@ -19,7 +19,9 @@ Compare
 >	20    [+] lambdafactory/python.pyc
 >	21    [+] lambdafactory/reporter.pyc
 
->	sink compare --update=19 Sources/python Build
+>	sink compare -pick=19:1 Sources/python Build
+>	sink compare -update=19 Sources/python/Build
+>	sink compare -keep=19   Sources/python/Build
 
 Tracking
 ========
@@ -33,4 +35,7 @@ Tracking
 	- Created => Added, Modified => Changed ?
 	- Don't remember why child nodes have to be canonically sorted... this takes
 	  unnecessary time
+
+>	sink track -snapshot snapshot.sink ~/Sources...
+>	sink compare snap:snapshot.sink ~/Source/Folder
 	

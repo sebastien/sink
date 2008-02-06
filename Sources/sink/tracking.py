@@ -891,13 +891,13 @@ class Engine:
 
 	def setup( self, config ):
 		"""Sets up the engine using the given configuration object."""
-		if os.environ.get("DIFF"): self.diff_command = os.environ.get("DIFF")
 		self.mode          = config["sink.mode"]
 		self.diff_command  = config["sink.diff"]
 		self.diffs         = []
 		self.accepts       = config["filters.accepts"]
 		self.rejects       = config["filters.rejects"]
 		self.ignore_spaces = config["sink.whitespace"]
+		if os.environ.get("DIFF"): self.diff_command = os.environ.get("DIFF")
 		self.show          = {}
 
 	def run( self, arguments ):
@@ -1082,6 +1082,7 @@ class Engine:
 			for _diff, _dir in diffs:
 				if _diff == num: return _dir
 			return None
+		commands_to_execute = []
 		for loc in all_locations_keys:
 			# For the origin, the node is either ABSENT or SAME
 			if origin.nodeWithLocation(loc) == None:
@@ -1119,12 +1120,15 @@ class Engine:
 					dst = dst.getAbsoluteLocation()
 					self.logger.message("Diff: '%s' --> '%s'" % (src,dst))
 					command = '%s %s %s' % ( diffcommand,src,dst)
-					os.system(command)
+					commands_to_execute.append(command)
 			counter += 1
 		# if added:     self.logger.message( "\t%5s were added    [+]" % (len(added)))
 		# if removed:   self.logger.message( "\t%5s were removed   ! " % (len(removed)))
 		# if changed:   self.logger.message( "\t%5s were modified [>]" % (len(changed)))
 		# if unchanged: self.logger.message( "\t%5s are the same  [=]" % (len(unchanged)))
 		if not all_locations_keys: self.logger.message("No changes found.")
+		for command in commands_to_execute:
+			print ">>", command
+			os.system(command)
 
 # EOF - vim: sw=4 ts=4 tw=80 noet
