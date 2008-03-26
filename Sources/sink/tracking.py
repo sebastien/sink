@@ -7,7 +7,7 @@
 # License           :   BSD License (revised)
 # -----------------------------------------------------------------------------
 # Creation date     :   09-Dec-2003
-# Last mod.         :   24-Jul-2006
+# Last mod.         :   26-Mar-2008
 # -----------------------------------------------------------------------------
 # Notes             :   NodeStates SHOULD not be created directly, because they
 #                       MUST be cached (signature and location) in their
@@ -178,6 +178,18 @@ class NodeState:
 	def getAttributes( self ):
 		"""Returns the attributes of this node."""
 		return self._attributes
+
+	def getSize( self ):
+		"""Alias to 'getAttribute("Size")'"""
+		return self.getAttribute("Size")
+
+	def getCreation( self ):
+		"""Alias to 'getAttribute("Creation")'"""
+		return self.getAttribute("Creation")
+
+	def getModification( self ):
+		"""Alias to 'getAttribute("Modification")'"""
+		return self.getAttribute("Modification")
 
 	def _attributeInSignature( self, attributeName ):
 		"""Tells wether the given attribute name should be used in the computation
@@ -594,6 +606,10 @@ class State:
 		for node in self.root().walkNodeStates():
 			if not node.isCached():
 				self.cacheNodeState(node)
+
+	def nodes( self ):
+		"""Returns the list of all nodes registered in this state"""
+		return self._locations.values()
 
 	def nodesWithContentSignature( self, signature ):
 		"""Returns a list of nodes with the given content signature. The node
