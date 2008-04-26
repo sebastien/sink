@@ -65,6 +65,7 @@ class NodeState:
 		self.location( location )
 		assert type(self._accepts) in (tuple, list)
 		assert type(self._rejects) in (tuple, list)
+		state.onNodeCreated(self)
 
 	def isDirectory( self ):
 		"""Tells wether the node is a directory or not."""
@@ -536,6 +537,11 @@ class State:
 		self.rejects(rejects)
 		if populate:
 				self.populate()
+
+	def onNodeCreated( self, node ):
+		"""A callback placeholder that can be used to output stuff when a node
+		is created."""
+		return None
 
 	def accepts( self, a ):
 		"""Specifies the GLOBS (as strings) that all inserted node must
