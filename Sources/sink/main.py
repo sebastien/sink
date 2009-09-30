@@ -15,10 +15,10 @@ from os.path import basename, dirname, exists
 # We try to import the sink module. If we have trouble, we simply insert the
 # path into the Python path
 try:
-	from sink import tracking, linking
+	from sink import tracking, linking, snapshot
 except:
 	sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-	from sink import tracking, linking
+	from sink import tracking, linking, snapshot
 
 __version__ = "1.0.0"
 
@@ -108,6 +108,7 @@ DEFAULTS = {
 OPERATIONS = {
 	"-c":tracking.Engine,
 	"-l":linking.Engine,
+	"-s":snapshot.Engine,
 	"":tracking.Engine
 }
 
@@ -169,6 +170,8 @@ def run( arguments, runningPath=".", logger=None ):
 				print tracking.USAGE
 			elif args[1] == "link":
 				print linking.USAGE
+			elif args[1] == "snapshot":
+				print snapshot.USAGE
 			else:
 				print USAGE
 			return
@@ -179,7 +182,6 @@ def run( arguments, runningPath=".", logger=None ):
 		print __version__
 		return
 	elif args[0] in OPERATIONS.keys():
-		print "*****", args
 		engine = OPERATIONS[args[0]](logger, config)
 		return engine.run(args[1:])
 		#try:

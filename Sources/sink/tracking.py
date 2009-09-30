@@ -43,8 +43,19 @@ class NodeState:
 	MODIFIED = "m"
 	COUNTER  = 0
 	
+	@staticmethod
+	def FromDict( state, data ):
+		assert state
+		location = data["attributes"].get("location")
+		if   data["type"] == FileNodeState.__name__:
+			return FileNodeState(state, location, data=data)
+		elif data["type"] == DirectoryNodeState.__name__:
+			return DirectoryNodeState(state, location, data=data)
+		else:
+			assert None, "Unsupported type: %s" % (data["type"])
+
 	def __init__( self, state, location, usesSignature=True, accepts=(),
-	rejects=() ):
+	rejects=(), data=None ):
 		"""Creates a file system node with the given location. The location
 		is relative to the state root. The usesSignature parameter allows to
 		specify wether the node should use a signature or not. Large file nodes may take
@@ -57,6 +68,8 @@ class NodeState:
 		attributes can be set by hand."""
 		self._uid    = "N%s" % (NodeState.COUNTER)
 		self._parent = None
+		self._state  = None
+		self._cached = False
 		self._accepts = accepts
 		self._rejects = rejects
 		self._attributes = {}
@@ -66,6 +79,7 @@ class NodeState:
 		self._usesSignature = usesSignature
 		self._belongsToState( state )
 		NodeState.COUNTER += 1
+		if data: self.importFromDict(data)
 		self.location( location )
 		assert type(self._accepts) in (tuple, list)
 		assert type(self._rejects) in (tuple, list)
@@ -273,14 +287,14 @@ class NodeState:
 class DirectoryNodeState(NodeState):
 	"""A node representing a directory on the filesystem"""
 
-	def __init__( self, state, location, accepts=(), rejects=() ):
+	def __init__( self, state, location, accepts=(), rejects=(), data=None ):
 		"""Creates a new directory node.
 
 		Same operations as the file system node."""
 		# The list of child nodes
 		self._children = []
 		NodeState.__init__(self, state, location, usesSignature=False,
-		accepts=accepts, rejects=rejects )
+		accepts=accepts, rejects=rejects, data=data )
 
 	def exportToDict( self ):
 		result = NodeState.exportToDict(self)
@@ -290,13 +304,7 @@ class DirectoryNodeState(NodeState):
 	def importFromDict( self, data ):
 		result = NodeState.importFromDict(self, data)
 		for child in data["children"]:
-			child_type = child["type"]
-			if   child_type == DirectoryNodeState.__name__:
-				assert None
-			elif child_type == NodeState.__name__:
-				assert None
-			else:
-				assert None, "Unsuported child type"
+			self._children.append(NodeState.FromDict(self._state, child))
 		return self
 
 	def isDirectory( self ):
@@ -552,6 +560,21 @@ class State:
 	particular moment.. These nodes can be later queried by location and
 	signature."""
 
+	@staticmethod
+	def FromDict( data ):
+		root = data["rootNodeState"]
+		state = State(
+			data["rootLocation"],
+			None,
+			populate=False,
+			accepts=list(data["accepts"]),
+			rejects=list(data["rejects"])
+		)
+		root = NodeState.FromDict(state, root)
+		state.root(root)
+		state.cacheNodeStates()
+		return state
+
 	def __init__( self, rootLocation, rootNodeState=None, populate=False,
 	accepts=(), rejects=() ):
 		"""Creates a new state with the given location as the root. If the populate
@@ -573,6 +596,7 @@ class State:
 		self._rejects   = []
 		self._locations = {}
 		self._rootNodeState = None
+		self._rootLocation  = None
 		if rootLocation: self.location(os.path.abspath(rootLocation))
 		else: self.location(None)
 		self.root(rootNodeState)
@@ -588,7 +612,7 @@ class State:
 		result = {
 			"accepts":self._accepts,
 			"rejects":self._rejects,
-			"locations":locations,
+			"rootLocation": self._rootLocation,
 			"rootNodeState":self._rootNodeState and self._rootNodeState.exportToDict()
 		}
 		return result
@@ -626,7 +650,7 @@ class State:
 	def root( self, node=None ):
 		"""Returns this state root node."""
 		if node != None: self._rootNodeState = node
-		else:	return self._rootNodeState
+		else: return self._rootNodeState
 
 	def getCreationTime( self ):
 		"""Returns the time at which this state was created"""
