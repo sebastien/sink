@@ -955,7 +955,7 @@ Options:
 
   -c, --content (dflt)   Uses content analysis to detect changes
   -t, --time             Uses timestamp to detect changes
-  -nNUM                  Compares the file at line NUM in the listing
+  -dNUM                  Compares the file at line NUM in the listing
   --ignore-spaces        Ignores the spaces when analyzing the content
   --ignore   GLOBS       Ignores the files that match the glob
   --only     GLOBS       Only accepts the file that match glob
@@ -963,12 +963,12 @@ Options:
 
 You can also specify what you want to be listed in the diff:
 
-  [-+]A                  Hides/Shows ALL files       [=]
+  [-+]A                  Hides/Shows ALL files
   [-+]s                  Hides/Shows SAME files       [=]
   [-+]a                  Hides/Shows ADDED files      [+]
   [-+]r                  Hides/Shows REMOVED files    [-]
   [-+]m                  Hides/Shows MODIFIED files   [>] or [<]
-  [-+]N                  Hides/Shows NEWER files      [>]
+  [-+]n                  Hides/Shows NEWER files      [>]
   [-+]o                  Hides/Shows OLDER files      [<]
 
 GLOBS understand '*' and '?', will refer to the basename and can be
@@ -979,7 +979,7 @@ Legend:
 
 [=] no changes         [+] file added           [>] changed/newer
                        [-] file removed         [<] changed/older
-                        !  file missing
+                       -!- file missing
 """ 
 
 CONTENT_MODE = True
@@ -989,7 +989,7 @@ REMOVED      = "[-]"
 NEWER        = "[>]"
 OLDER        = "[<]"
 SAME         = "[=]"
-ABSENT       = " ! "
+ABSENT       = "-!-"
 
 class Engine:
 	"""Implements operations used by the Sink main command-line interface."""
@@ -1016,7 +1016,7 @@ class Engine:
 		self.show          = {}
 
 	def _parseOptions( self, arguments ):
-		return getopt.getopt( arguments, "cthVvln:iarsmNo",\
+		return getopt.getopt( arguments, "cthVvld:iarsmno",\
 		["version", "help", "verbose", "list", "checkin", "checkout",
 		"modified",
 		"time", "content", "ignore-spaces", "ignorespaces", "diff=", "ignore=",
@@ -1126,19 +1126,16 @@ class Engine:
 			origin_state = State.FromJSONFile(origin_path)
 		else:
 			origin_state = State(origin_path, accepts=accepts, rejects=rejects)
+			origin_state.populate( lambda x: self.mode )
 		compared_states = []
 		for path in compared_paths:
 			if os.path.isfile(path):
 				compared_states.append(State.FromJSONFile(path))
 			else:
-				compared_states.append(State(path, accepts=accepts, rejects=rejects))
+				state = State(path, accepts=accepts, rejects=rejects)
+				state.populate(lambda x: self.mode )
+				compared_states.append(state)
 
-		# Scans the source and destination, and updates
-		#logger.message("Scanning origin: " + origin_path)
-		origin_state.populate( lambda x: self.mode )
-		for state in compared_states:
-			#logger.message("Scanning compared: " + state.location())
-			state.populate(lambda x: self.mode )
 		changes     = []
 		any_changes = False
 		for state in compared_states:
@@ -1157,7 +1154,7 @@ class Engine:
 				diffs, diffcommand=self.diff_command, show=show
 			)
 		else:
-			logger.message("Nothing changed.")
+			logger.message("No differences")
 		return 0
 
 	def usage( self ):
