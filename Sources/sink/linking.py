@@ -7,12 +7,12 @@
 # License           :   BSD License (revised)
 # -----------------------------------------------------------------------------
 # Creation date     :   23-Jul-2007
-# Last mod.         :   20-Sep-2007
+# Last mod.         :   29-Sep-2009
 # -----------------------------------------------------------------------------
 
 # TODO: Make it standalone (so it can be intergrated into Mercurial Contrib)
 
-import os, sys, sha, stat, getopt, shutil
+import os, sys, hashlib, stat, getopt, shutil
 
 #------------------------------------------------------------------------------
 #
@@ -227,13 +227,13 @@ USAGE = """\
 
   Available operations are:
 
-     link init           Initializes a link database for a specific folder
-     link add            Creates a link between two file
-     link remove         Removes a link between two files
-     link status         Gives the status of linked files
-     link update         Updates the linked files
+     -l init           Initializes a link database for a specific folder
+     -l add            Creates a link between two file
+     -l remove         Removes a link between two files
+     -l status         Gives the status of linked files
+     -l update         Updates the linked files
 
-  sink link init [PATH]
+  sink -l init [PATH]
 
     Initialises the link database for the current folder, or the folder at the
     given PATH. If PATH is omitted, it will use the current folder, or will look
@@ -242,7 +242,7 @@ USAGE = """\
 
     There are no options for this command.
 
-  sink link add [OPTIONS] SOURCE DESTINATION
+  sink -l add [OPTIONS] SOURCE DESTINATION
 
     Creates a link from the the SOURCE to the DESTINATION. The DESTINATION must
     be contained in a directory where the 'link init' command was run.
@@ -251,14 +251,14 @@ USAGE = """\
 
       -w, --writable    Link will be made writable (so that you can update it)
 
-  sink link status [PATH|LINK]...
+  sink -l status [PATH|LINK]...
 
      Returns the status of the given links. If no link is given, the status of
      all links will be returned. When no argument is given, the current
      directory (or one of its parent) must contain a link database, otherwise
      you should give a PATH containing a link databae.
 
-  sink link update [OPTIONS] [PATH|LINK]...
+  sink -l update [OPTIONS] [PATH|LINK]...
 
      Updates the given links in the current or given PATH, or updates only the
      given list of LINKs (they must belong to the same link DB, accessible from
@@ -275,7 +275,7 @@ USAGE = """\
        -f, --force       Forces the update, ignoring local modifications
        -m, --merge       Uses the $MERGETOOL to merge the link source and dest
 
-  sink link remove LINK [LINK..]
+  sink -l remove LINK [LINK..]
 
       Removes one or more link from the link database. The links destinations
       won't be removed from the filesystem unlesse you specify '--delete'.
@@ -535,7 +535,7 @@ class Engine:
 		return c
 
 	def _sha( self, content ):
-		return sha.new(content).hexdigest()
+		return hashlib.sha1(content).hexdigest()
 
 	def _mtime( self, path ):
 		"""Returns the modification time of the file at the give path."""

@@ -4,10 +4,11 @@
 # Project           :   Sink
 # -----------------------------------------------------------------------------
 # Author            :   Sebastien Pierre                 <sebastien@type-z.org>
+# -----------------------------------------------------------------------------
 # License           :   BSD License (revised)
 # -----------------------------------------------------------------------------
 # Creation date     :   09-Dec-2003
-# Last mod.         :   26-Mar-2008
+# Last mod.         :   29-Sep-2009
 # -----------------------------------------------------------------------------
 # Notes             :   NodeStates SHOULD not be created directly, because they
 #                       MUST be cached (signature and location) in their
@@ -15,7 +16,7 @@
 #                       tracker.
 # -----------------------------------------------------------------------------
 
-import os, sha, stat, time, fnmatch, getopt
+import os, hashlib, stat, time, fnmatch, getopt, simplejson, uuid
 
 # Error messages
 
@@ -40,6 +41,7 @@ class NodeState:
 	ADDED    = "+"
 	REMOVED  = "-"
 	MODIFIED = "m"
+	COUNTER  = 0
 	
 	def __init__( self, state, location, usesSignature=True, accepts=(),
 	rejects=() ):
@@ -53,6 +55,7 @@ class NodeState:
 		attributes attributes from the local filesystem, but this implies that the
 		nodes exists on the file system. Otherwise the `_attributes' and `_contentSignature'
 		attributes can be set by hand."""
+		self._uid    = "N%s" % (NodeState.COUNTER)
 		self._parent = None
 		self._accepts = accepts
 		self._rejects = rejects
@@ -62,10 +65,34 @@ class NodeState:
 		self._attributesSignature = None
 		self._usesSignature = usesSignature
 		self._belongsToState( state )
+		NodeState.COUNTER += 1
 		self.location( location )
 		assert type(self._accepts) in (tuple, list)
 		assert type(self._rejects) in (tuple, list)
 		state.onNodeCreated(self)
+
+	def exportToDict( self ):
+		result = {
+			"parent":self._parent and self._parent.location(),
+			"type": self.__class__.__name__,
+			"uid": self._uid,
+			"accepts":self._accepts,
+			"rejects":self._rejects,
+			"attributes":self._attributes,
+			"tags":self._tags,
+			"contentSignature":self._contentSignature,
+			"attributesSignature":self._usesSignature,
+		}
+		return result
+
+	def importFromDict( self, data ):
+		self._accepts    = data["accepts"]
+		self._rejects    = data["rejects"]
+		self._attributes = data["attributes"]
+		self._tags       = data["tags"]
+		self._contentSignature    = data["contentSignature"]
+		self._attributesSignature = data["attributesSignature"]
+		return self
 
 	def isDirectory( self ):
 		"""Tells wether the node is a directory or not."""
@@ -210,12 +237,12 @@ class NodeState:
 		# Updates the attributes signature
 		items = self._attributes.items()
 		items.sort()
-		signature = sha.new()
+		signature = []
 		for key, value in items:
 			# Creation attribute does not appear in the attributes signature
 			if self._attributeInSignature(key):
-				signature.update(str(key)+str(value))
-		self._attributesSignature = signature.hexdigest()
+				signature.append(str(key)+str(value))
+		self._attributesSignature = hashlib.sha1("".join(signature)).hexdigest()
 
 	def getContentSignature( self ):
 		if self._contentSignature == None: self._updateSignature()
@@ -254,6 +281,23 @@ class DirectoryNodeState(NodeState):
 		self._children = []
 		NodeState.__init__(self, state, location, usesSignature=False,
 		accepts=accepts, rejects=rejects )
+
+	def exportToDict( self ):
+		result = NodeState.exportToDict(self)
+		result["children"] = tuple(n.exportToDict() for n in self._children)
+		return result
+
+	def importFromDict( self, data ):
+		result = NodeState.importFromDict(self, data)
+		for child in data["children"]:
+			child_type = child["type"]
+			if   child_type == DirectoryNodeState.__name__:
+				assert None
+			elif child_type == NodeState.__name__:
+				assert None
+			else:
+				assert None, "Unsuported child type"
+		return self
 
 	def isDirectory( self ):
 		"""Returns True."""
@@ -375,10 +419,10 @@ class DirectoryNodeState(NodeState):
 		"""A directory signature is the signature of the string composed of the
 		names of all of its elements."""
 		NodeState._updateSignature(self)
-		self._contentSignature = sha.new()
+		children = []
 		for child in self.getChildren():
-			self._contentSignature.update(os.path.basename(child.location()))
-		self._contentSignature = self._contentSignature.hexdigest()
+			children.append(os.path.basename(child.location()))
+		self._contentSignature = hashlib.sha1("".join(children)).hexdigest()
 
 	def __repr__(self):
 		def indent(text, value = "  ", firstLine=False):
@@ -427,8 +471,7 @@ class FileNodeState(NodeState):
 		# allows to perform quick changes detection when large files are
 		# involved.
 		# if self.usesSignature():
-		self._contentSignature = sha.new(self.getData())
-		self._contentSignature = self._contentSignature.hexdigest()
+		self._contentSignature = hashlib.sha1(self.getData()).hexdigest()
 
 #------------------------------------------------------------------------------
 #
@@ -538,6 +581,18 @@ class State:
 		if populate:
 				self.populate()
 
+	def exportToDict( self ):
+		locations = {}
+		for k,v in self._locations.items():
+			locations[k] = v._uid
+		result = {
+			"accepts":self._accepts,
+			"rejects":self._rejects,
+			"locations":locations,
+			"rootNodeState":self._rootNodeState and self._rootNodeState.exportToDict()
+		}
+		return result
+
 	def onNodeCreated( self, node ):
 		"""A callback placeholder that can be used to output stuff when a node
 		is created."""
@@ -638,7 +693,7 @@ class State:
 
 	def __repr__(self):
 		return repr(self.root())
-	
+
 #------------------------------------------------------------------------------
 #
 #  Change tracking
@@ -857,7 +912,7 @@ class Tracker:
 
 #TODO: Describe -d option
 USAGE = """\
-  sink compare [OPTIONS] [OPERATION] ORIGIN COMPARED...
+  sink [-d] [OPTIONS] [OPERATION] ORIGIN COMPARED...
 
   ORIGIN    is the directory to which we want to compare the others
   COMPARED  is a list of directories that will be compared to ORIGIN
@@ -866,37 +921,41 @@ USAGE = """\
 
     -c, --content (DEF)    Uses content analysis to detect changes
     -t, --time             Uses timestamp to detect changes
+    -nNUM                  Compares the file at line NUM in the listing
     --ignore-spaces        Ignores the spaces when analyzing the content
     --ignore GLOBS         Ignores the files that match the glob
     --only   GLOBS         Only accepts the file that match glob
-    --filter PATTERN       Tells which files you want to list
+    --difftool TOOL        Specifies a specific too for the -n option
 
   You can also specify what you want to be listed in the diff:
 
+    [-+]A                  Hides/Shows ALL files       [=]
     [-+]s                  Hides/Shows SAME files       [=]
     [-+]a                  Hides/Shows ADDED files      [+]
-    [-+]r                  Hides/Shows REMOVED files     !
+    [-+]r                  Hides/Shows REMOVED files    [-]
     [-+]m                  Hides/Shows MODIFIED files   [>] or [<]
-    [-+]n                  Hides/Shows NEWER files      [>]
+    [-+]N                  Hides/Shows NEWER files      [>]
     [-+]o                  Hides/Shows OLDER files      [<]
-
-  PATTERN is a string containing any of the symbols between braces ([?])
-  listed above (eg. --filter '+-<>').
 
   GLOBS understand '*' and '?', will refer to the basename and can be
   separated by commas. If a directory matches the glob, it will not be
   traversed (ex: --ignore '*.pyc,*.bak,.[a-z]*')
 
+  Legend:
+
+  [=] no changes         [+] file added           [>] changed/newer
+                         [-] file removed         [<] changed/older
+                          !  file missing
 """ 
 
 CONTENT_MODE = True
 TIME_MODE    = False
 ADDED        = "[+]"
-REMOVED      = " ! "
+REMOVED      = "[-]"
 NEWER        = "[>]"
 OLDER        = "[<]"
 SAME         = "[=]"
-ABSENT       = "   "
+ABSENT       = " ! "
 
 class Engine:
 	"""Implements operations used by the Sink main command-line interface."""
@@ -933,11 +992,11 @@ class Engine:
 		command, arguments = arguments[0], arguments[1:]
 		# We extract the arguments
 		try:
-			optlist, args = getopt.getopt( arguments, "cthVvld:iarsmno",\
+			optlist, args = getopt.getopt( arguments, "cthVvln:iarsmNo",\
 			["version", "help", "verbose", "list", "checkin", "checkout",
 			"modified",
 			"time", "content", "ignore-spaces", "ignorespaces", "diff=", "ignore=",
-			"ignores=", "accept=", "accepts=", "only="])
+			"ignores=", "accept=", "accepts=", "filter", "only="])
 		except Exception, e:
 			return self.logger.error(e)
 		# We parse the options
@@ -961,8 +1020,11 @@ class Engine:
 				if arg.find(":") == -1: diff, _dir = int(arg), 0
 				else: diff, _dir = map(int, arg.split(":"))
 				self.diffs.append((diff, _dir))
-			elif opt == '--diff':
+			elif opt == '--difftool':
 				self.diff_command = arg
+			elif opt == "+A":
+				for t in [ADDED, REMOVED, SAME, NEWER, OLDER]:
+					self.show[t]   = False
 			elif opt in ('-a'):
 				self.show[ADDED]   = False
 			elif opt in ('-r'):
@@ -979,7 +1041,10 @@ class Engine:
 		# We adjust the show
 		nargs = []
 		for arg in args:
-			if   arg == "+a":
+			if   arg == "+A":
+				for t in [ADDED, REMOVED, SAME, NEWER, OLDER]:
+					self.show[t] = True
+			elif arg == "+a":
 				self.show[ADDED] = True
 			elif arg == "+r":
 				self.show[REMOVED] = True
@@ -1038,6 +1103,12 @@ class Engine:
 				method=Tracker.TIME))
 			any_changes = changes[-1].anyChanges() or any_changes
 		
+		print "==================="
+		f = file("pouet.data", "w")
+		import simplejson
+		f.write((simplejson.dumps(origin_state.exportToDict())))
+		print "==================="
+		assert None
 		# We apply the operation
 		if any_changes:
 			self.listChanges(

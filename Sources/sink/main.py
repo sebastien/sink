@@ -1,13 +1,12 @@
 #!/usr/bin/env python
-# Encoding: iso-8859-1
 # -----------------------------------------------------------------------------
-# Project           :   Sink                   <http://sofware.type-z.org/sink>
+# Project           :   Sink                 <http://github.com/sebastien/sink>
 # -----------------------------------------------------------------------------
 # Author            :   Sebastien Pierre                 <sebastien@type-z.org>
 # License           :   BSD License (revised)
 # -----------------------------------------------------------------------------
 # Creation date     :   03-Dec-2004
-# Last mod.         :   24-Jul-2006
+# Last mod.         :   29-Sep-2009
 # -----------------------------------------------------------------------------
 
 import os, sys, shutil, getopt, string, ConfigParser
@@ -21,7 +20,7 @@ except:
 	sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 	from sink import tracking, linking
 
-__version__ = "0.9.8"
+__version__ = "1.0.0"
 
 #------------------------------------------------------------------------------
 #
@@ -35,7 +34,7 @@ class Logger:
 
 	@staticmethod
 	def default():
-		"""Returnts the default logger instance."""
+		"""Returs the default logger instance."""
 		if not hasattr(Logger, "DEFAULT"):
 			Logger.DEFAULT = Logger()
 		return Logger.DEFAULT
@@ -71,24 +70,30 @@ class Logger:
 #------------------------------------------------------------------------------
 
 USAGE = """\
-Sink - v.%s
+sink (%s)
 
-  Sink is the swiss army-knife for many common development synchronisation
-  needs.
+Sink is the swiss army-knife for many common directory comparison and 
+synchronization.
 
-  Usage:    sink [OPERATION?] [ARGUMENTS]
+Usage:    sink [MODE] [OPTIONS]
 
-  OPERATION    the operation you want to use ('changes' by default, see below)
-  ARGUMENTS    the arguments to the operations (use --help to know more)
+Modes:
 
-  Operations:
+  (-d/--diff)    Lists the changes between two or more directories
+  (-l/--link) 
+  (-h/--help)    Gives detailed help about a specific operation
 
-    changes (DEF)  Lists the changes between two or more directories
-    link           Manage synchrnoisation links between files
-    help           Gives detailed help about a specific operation
+Options:
 
-  Type 'sink help changes' or 'sink changes --help' to get detailed information
-  about the 'changes' operation.
+  See 'sink --help changes' and 'sink --help link' for more information
+  about each mode options.
+
+Examples:
+
+   sink DIR1 DIR2 DIR3           Compares the contents of DIR1, DIR2 and DIR3
+   sink -n1 DIR1 DIR2            Shows difference between version of file 1
+                                 in the listing given by 'sink DIR1 DIR2'
+   sink --only '*.py' D1 D2      Comparens the '*.py' files in D1 and D2
 
 """ % (__version__)
 
@@ -101,8 +106,8 @@ DEFAULTS = {
 }
 
 OPERATIONS = {
-	"list":tracking.Engine,
-	"link":linking.Engine,
+	"-c":tracking.Engine,
+	"-l":linking.Engine,
 	"":tracking.Engine
 }
 
@@ -159,12 +164,22 @@ def run( arguments, runningPath=".", logger=None ):
 	# If there is no arguments
 	args = arguments
 	if not args or args[0] in ('-h', '--help'):
-		print USAGE
-		return
+		if len(args) == 2:
+			if   args[1] == "diff":
+				print tracking.USAGE
+			elif args[1] == "link":
+				print linking.USAGE
+			else:
+				print USAGE
+			return
+		else:
+			print USAGE
+			return
 	elif args[0] == '--version':
 		print __version__
 		return
 	elif args[0] in OPERATIONS.keys():
+		print "*****", args
 		engine = OPERATIONS[args[0]](logger, config)
 		return engine.run(args[1:])
 		#try:
