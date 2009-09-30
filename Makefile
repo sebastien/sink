@@ -26,7 +26,7 @@
 # Project name. Do not put spaces.
 PROJECT         = Sink
 PROJECT_VERSION = $(shell grep -r  __version__ Sources | head -n1 | cut -d'"' -f2)
-PROJECT_STATUS  = BETA
+PROJECT_STATUS  = RELEASE
 
 DOCUMENTATION   = Documentation
 SOURCES         = Sources
@@ -43,7 +43,7 @@ DISTROCONTENT   = $(DOCS) $(SOURCES) $(TESTS) $(SCRIPTS) $(RESOURCES) \
 
 PACKAGE         = sink
 MAIN            = main.py
-MODULES         = sink.main sink.tracking  sink.linking
+MODULES         = sink.main sink.tracking sink.linking sink.snaphot
 
 TEST_MAIN       = $(TESTS)/$(PROJECT)Test.py
 SOURCE_FILES    = $(shell find $(SOURCES) -name "*.py")

@@ -1,8 +1,7 @@
 #!/usr/bin/python
 # Encoding: ISO-8859-1
-# vim: tw=80 ts=4 sw=4 fenc=latin-1 noet
 # -----------------------------------------------------------------------------
-# Project           :   Sink                   <http://sofware.type-z.org/sink>
+# Project           :   Sink
 # -----------------------------------------------------------------------------
 # Author            :   Sebastien Pierre                 <sebastien@type-z.org>
 # License           :   Revised BSD License
@@ -12,7 +11,7 @@
 # -----------------------------------------------------------------------------
 
 import sys ; sys.path.insert(0, "Sources")
-from tahchee import main
+from sink import main
 from distutils.core import setup
 
 SUMMARY     = "Multiple directory change detection and synchronization"
@@ -30,14 +29,14 @@ copies of a single directory.
 # ------------------------------------------------------------------------------
 
 setup(
-    name        = "Sink",
+    name        = "sink",
     version     = main.__version__,
     author      = "Sebastien Pierre", author_email = "sebastien@type-z.org",
     description = SUMMARY, long_description = DESCRIPTION,
     license     = "Revised BSD License",
     keywords    = "change detection, synchronization",
-    url         = "http://www.ivy.fr/sink",
-    download_url= "http://www.ivy.fr/sink/sink-%s.tar.gz" % (main.__version__) ,
+    url         = "http://github.com/sebastien/sink",
+    download_url= "http://github.com/sebastien/sink/tarball/master",
     package_dir = { "": "Sources" },
     packages    = ["sink"],
     scripts     = ["Scripts/sink"],
@@ -58,4 +57,4 @@ setup(
     ]
 )
 
-# EOF
+# EOF - vim: tw=80 ts=4 sw=4 fenc=latin-1 noet
