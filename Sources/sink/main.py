@@ -79,9 +79,10 @@ Usage:    sink [MODE] [OPTIONS]
 
 Modes:
 
-  (-d/--diff)    Lists the changes between two or more directories
-  (-l/--link) 
-  (-h/--help)    Gives detailed help about a specific operation
+  (diff/-d/--diff)    Lists the changes between two or more directories
+  (link/-l/--link)    Manages a links between files
+  (snap/-s/--snap)    Takes snapshot of a directory
+  (help/-h/--help)    Gives detailed help about a specific operation
 
 Options:
 
@@ -106,9 +107,15 @@ DEFAULTS = {
 }
 
 OPERATIONS = {
-	"-c":tracking.Engine,
+	"-d":tracking.Engine,
 	"-l":linking.Engine,
 	"-s":snapshot.Engine,
+	"--diff":tracking.Engine,
+	"--link":linking.Engine,
+	"--snap":snapshot.Engine,
+	"diff":tracking.Engine,
+	"link":linking.Engine,
+	"snap":snapshot.Engine,
 	"":tracking.Engine
 }
 
@@ -170,7 +177,7 @@ def run( arguments, runningPath=".", logger=None ):
 				print tracking.USAGE
 			elif args[1] == "link":
 				print linking.USAGE
-			elif args[1] == "snapshot":
+			elif args[1] == "snap":
 				print snapshot.USAGE
 			else:
 				print USAGE

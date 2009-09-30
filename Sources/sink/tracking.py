@@ -336,7 +336,10 @@ class DirectoryNodeState(NodeState):
 		# We ensure that the directory exists
 		assert self.exists()
 		# We retrieve an order list of the directory content
-		content=os.listdir(self.getAbsoluteLocation())
+		try:
+			content = os.listdir(self.getAbsoluteLocation())
+		except OSError:
+			return
 		self._children = []
 		# We create new nodes for each content
 		for element_loc in content:
@@ -943,40 +946,40 @@ class Tracker:
 
 #TODO: Describe -d option
 USAGE = """\
-  sink [-d] [OPTIONS] [OPERATION] ORIGIN COMPARED...
+sink [-d|diff] [OPTIONS] [OPERATION] ORIGIN COMPARED...
 
-  ORIGIN    is the directory to which we want to compare the others
-  COMPARED  is a list of directories that will be compared to ORIGIN
+ORIGIN    is the directory to which we want to compare the others
+COMPARED  is a list of directories that will be compared to ORIGIN
 
-  Options:
+Options:
 
-    -c, --content (DEF)    Uses content analysis to detect changes
-    -t, --time             Uses timestamp to detect changes
-    -nNUM                  Compares the file at line NUM in the listing
-    --ignore-spaces        Ignores the spaces when analyzing the content
-    --ignore GLOBS         Ignores the files that match the glob
-    --only   GLOBS         Only accepts the file that match glob
-    --difftool TOOL        Specifies a specific too for the -n option
+  -c, --content (dflt)   Uses content analysis to detect changes
+  -t, --time             Uses timestamp to detect changes
+  -nNUM                  Compares the file at line NUM in the listing
+  --ignore-spaces        Ignores the spaces when analyzing the content
+  --ignore   GLOBS       Ignores the files that match the glob
+  --only     GLOBS       Only accepts the file that match glob
+  --difftool TOOL        Specifies a specific too for the -n option
 
-  You can also specify what you want to be listed in the diff:
+You can also specify what you want to be listed in the diff:
 
-    [-+]A                  Hides/Shows ALL files       [=]
-    [-+]s                  Hides/Shows SAME files       [=]
-    [-+]a                  Hides/Shows ADDED files      [+]
-    [-+]r                  Hides/Shows REMOVED files    [-]
-    [-+]m                  Hides/Shows MODIFIED files   [>] or [<]
-    [-+]N                  Hides/Shows NEWER files      [>]
-    [-+]o                  Hides/Shows OLDER files      [<]
+  [-+]A                  Hides/Shows ALL files       [=]
+  [-+]s                  Hides/Shows SAME files       [=]
+  [-+]a                  Hides/Shows ADDED files      [+]
+  [-+]r                  Hides/Shows REMOVED files    [-]
+  [-+]m                  Hides/Shows MODIFIED files   [>] or [<]
+  [-+]N                  Hides/Shows NEWER files      [>]
+  [-+]o                  Hides/Shows OLDER files      [<]
 
-  GLOBS understand '*' and '?', will refer to the basename and can be
-  separated by commas. If a directory matches the glob, it will not be
-  traversed (ex: --ignore '*.pyc,*.bak,.[a-z]*')
+GLOBS understand '*' and '?', will refer to the basename and can be
+separated by commas. If a directory matches the glob, it will not be
+traversed (ex: --ignore '*.pyc,*.bak,.[a-z]*')
 
-  Legend:
+Legend:
 
-  [=] no changes         [+] file added           [>] changed/newer
-                         [-] file removed         [<] changed/older
-                          !  file missing
+[=] no changes         [+] file added           [>] changed/newer
+                       [-] file removed         [<] changed/older
+                        !  file missing
 """ 
 
 CONTENT_MODE = True
@@ -1012,23 +1015,16 @@ class Engine:
 		if os.environ.get("DIFF"): self.diff_command = os.environ.get("DIFF")
 		self.show          = {}
 
-	def run( self, arguments ):
-		"""Runs the command using the given list of arguments (a list of
-		strings)."""
-		logger   = self.logger
-		accepts  = self.accepts
-		rejects  = self.rejects
-		show     = self.show
-		diffs    = self.diffs
+	def _parseOptions( self, arguments ):
+		return getopt.getopt( arguments, "cthVvln:iarsmNo",\
+		["version", "help", "verbose", "list", "checkin", "checkout",
+		"modified",
+		"time", "content", "ignore-spaces", "ignorespaces", "diff=", "ignore=",
+		"ignores=", "accept=", "accepts=", "filter", "only="])
+		
+	def configure( self, arguments ):
 		# We extract the arguments
-		try:
-			optlist, args = getopt.getopt( arguments, "cthVvln:iarsmNo",\
-			["version", "help", "verbose", "list", "checkin", "checkout",
-			"modified",
-			"time", "content", "ignore-spaces", "ignorespaces", "diff=", "ignore=",
-			"ignores=", "accept=", "accepts=", "filter", "only="])
-		except Exception, e:
-			return self.logger.error(e)
+		optlist, args = self._parseOptions(arguments)
 		# We parse the options
 		for opt, arg in optlist:
 			if opt in ('-h', '--help'):
@@ -1089,12 +1085,27 @@ class Engine:
 			else:
 				nargs.append(arg)
 		args = nargs
-
 		# We set the default values for the show, only if there was no + option
 		if self.show == {} or filter(lambda x:not x, self.show.values()):
 			for key,value in { ADDED:True, REMOVED:True, NEWER:True, OLDER:True,
 			SAME:False }.items():
 				self.show.setdefault(key, value)
+		return args
+
+	def run( self, arguments ):
+		"""Runs the command using the given list of arguments (a list of
+		strings)."""
+		logger   = self.logger
+		accepts  = self.accepts
+		rejects  = self.rejects
+		show     = self.show
+		diffs    = self.diffs
+
+		try:
+			args = self.configure(arguments)
+		except Exception, e:
+			return logger.error(e)
+
 		# We ensure that there are enough arguments
 		if len(args) < 2:
 			logger.error("Bad number of arguments\n" + USAGE)

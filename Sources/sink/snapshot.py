@@ -7,7 +7,7 @@
 # License           :   BSD License (revised)
 # -----------------------------------------------------------------------------
 # Creation date     :   29-Sep-2009
-# Last mod.         :   29-Sep-2009
+# Last mod.         :   30-Sep-2009
 # -----------------------------------------------------------------------------
 
 import os, simplejson
@@ -21,11 +21,34 @@ from sink import tracking
 
 #TODO: Describe -d option
 USAGE = """\
-sink [-s] DIRECTORY|FILE
+sink [-s|snap] [OPTIONS] DIRECTORY|FILE
 
 Takes a snapshot of the given DIRECTORY and outputs it to the stdout. The
 output format is JSON. If FILE is given instead, then displays the content
 of the snapshot.
+
+Options:
+
+  -c, --content (dflt)   Uses content analysis to detect changes
+  -t, --time             Uses timestamp to detect changes
+  --ignore-spaces        Ignores the spaces when analyzing the content
+  --ignore   GLOBS       Ignores the files that match the glob
+  --only     GLOBS       Only accepts the file that match glob
+  
+Examples:
+
+  Taking a snapshot of the state of /etc
+
+  $ sink -s /etc > etc-`date +'%Y%m%d`.json
+
+  Listing the content of a snapshot
+
+  $ sink -s etc-20090930.json
+
+  Comparing two snapshots
+
+  $ sink -c etc-20090930.json etc-20091001.json
+
 """ 
 
 class Engine:
