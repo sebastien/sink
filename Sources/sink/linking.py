@@ -31,6 +31,7 @@ CFG_NOT_A_CHILD = "Link destination must be a subpath of %s"
 ERR_NOT_FOUND = "Path does not exist: %s"
 ERR_SOURCE_NOT_FOUND = "Link source for '%s' not found: %s"
 ERR_LINK_IS_NEWER = "Link is newer, update has to be forced: %s"
+ERR_ORIGIN_IS_NEWER = "Origin is newer, update has to be forced: %s"
 
 #------------------------------------------------------------------------------
 #
@@ -79,8 +80,9 @@ def has_hg( path ):
 #
 #------------------------------------------------------------------------------
 
-DB_FILE    = ".sink-links"
-DB_FILE_HG = os.path.join(".hg", "sink-links")
+DB_FILE     = ".sinklinks"
+DB_FILE_HG  = os.path.join(".hg",  "sinklinks")
+DB_FILE_GIT = os.path.join(".git", "sinklinks")
 
 class LinksCollection:
 
@@ -91,12 +93,15 @@ class LinksCollection:
 		if not path: return None
 		path = os.path.abspath(path)
 		parent = os.path.dirname(path)
-		fs_vlinks = os.path.join(path, DB_FILE)
-		hg_vlinks = os.path.join(path, DB_FILE_HG)
+		fs_vlinks  = os.path.join(path, DB_FILE)
+		hg_vlinks  = os.path.join(path, DB_FILE_HG)
+		git_vlinks = os.path.join(path, DB_FILE_GIT)
 		if os.path.exists(fs_vlinks):
 			return LinksCollection(path, DB_FILE)
 		elif os.path.exists(hg_vlinks):
 			return LinksCollection(path, DB_FILE_HG)
+		elif os.path.exists(hg_vlinks):
+			return LinksCollection(path, DB_FILE_GIT)
 		elif parent != path:
 			return LinksCollection.lookup(parent)
 		else:
@@ -222,68 +227,79 @@ class LinksCollection:
 #------------------------------------------------------------------------------
 
 USAGE = """\
-  sink link allows to create synchronisation links between files. It is
-  especially useful when files are shared between different projects.
+sink [-l|link] COMMAND [ARGUMENT ARGUMENT...]
 
-  Available operations are:
+Creates a platform-independen links database between files. This can be used
+as a replacement to 'ln' when symlinks are not appropriate.
 
-     -l init           Initializes a link database for a specific folder
-     -l add            Creates a link between two file
-     -l remove         Removes a link between two files
-     -l status         Gives the status of linked files
-     -l update         Updates the linked files
+Commands:
 
-  sink -l init [PATH]
+   init   [PATH]                        Creates a new link database
+   add    [OPTIONS] SOURCE DEST         Creates a link between two file
+   remove LINK [LINK]                   Removes the given links
+   status [PATH|LINK]                   Show the status of links
+   pull   [OPTIONS] [PATH|LINK]         Pulls changes from sources
+   push   [OPTIONS] [PATH|LINK]         Pushes changes to source
 
-    Initialises the link database for the current folder, or the folder at the
-    given PATH. If PATH is omitted, it will use the current folder, or will look
-    for a Mercurial (.hg) repository in the parent directories, and will use it
-    to store the links database.
+sink -l init [PATH]
 
-    There are no options for this command.
+  Initialises the link database for the current folder, or the folder at the
+  given PATH. If PATH is omitted, it will use the current folder, or will look
+  for a Mercurial (.hg) or Git (.git) repository in the parent directories, and
+  will use it to store the links database as a 'sinklinks' file.
 
-  sink -l add [OPTIONS] SOURCE DESTINATION
+  There are no options for this command.
 
-    Creates a link from the the SOURCE to the DESTINATION. The DESTINATION must
-    be contained in a directory where the 'link init' command was run.
+sink -l add [OPTIONS] SOURCE DESTINATION
+
+  Creates a link from the the SOURCE to the DESTINATION. The DESTINATION must
+  be contained in a directory where the 'link init' command was run.
+
+  Options:
+
+    -w, --writable    Link will be made writable (so that you can update them)
+
+sink -l remove LINK [LINK..]
+
+    Removes one or more link from the link database. The links destinations
+    won't be removed from the filesystem unlesse you specify '--delete'.
 
     Options:
 
-      -w, --writable    Link will be made writable (so that you can update it)
+      -d, --delete      Deletes the link destination (your local file)
 
-  sink -l status [PATH|LINK]...
+sink -l status [PATH|LINK]...
 
-     Returns the status of the given links. If no link is given, the status of
-     all links will be returned. When no argument is given, the current
-     directory (or one of its parent) must contain a link database, otherwise
-     you should give a PATH containing a link databae.
+   Returns the status of the given links. If no link is given, the status of
+   all links will be returned. When no argument is given, the current
+   directory (or one of its parent) must contain a link database, otherwise
+   you should give a PATH containing a link databae.
 
-  sink -l update [OPTIONS] [PATH|LINK]...
+sink -l pull [OPTIONS] [PATH|LINK]...
 
-     Updates the given links in the current or given PATH, or updates only the
-     given list of LINKs (they must belong to the same link DB, accessible from
-     the current path).
+   Updates the given local links in the current or given PATH, or updates only the
+   given list of LINKs (they must belong to the same link DB, accessible from
+   the current path).
 
-     If the link is newer than the source and has modifications, then the update
-     will not happen unless it is --force'd.
+   If the link is newer than the origin and has modifications, then the update
+   will not happen unless it is --force'd.
 
-     You can also merge back the changes by using '--merge'. This will start
-     your favorite $MERGETOOL.
+   You can also merge back the changes by using '--merge'. This will start
+   your favorite $MERGETOOL.
 
-     Options:
+   Options:
 
-       -f, --force       Forces the update, ignoring local modifications
-       -m, --merge       Uses the $MERGETOOL to merge the link source and dest
+     -f, --force       Forces the update, ignoring local modifications
+     -d, --difftool    Overrides your $MERGETOOL
 
-  sink -l remove LINK [LINK..]
+sink -l push [OPTIONS] [PATH|LINK]...
 
-      Removes one or more link from the link database. The links destinations
-      won't be removed from the filesystem unlesse you specify '--delete'.
+    Same as pull, but updates the origin according to your local version.
 
-      Options:
+   Options:
 
-        -d, --delete      Deletes the link destination (your local file)
-
+     -f, --force       Forces the update, ignoring local modifications
+     -d, --difftool    Overrides your $MERGETOOL
 """
 
 class Engine:
@@ -291,9 +307,9 @@ class Engine:
 	include giving status, resolving a link, and updating a link."""
 
 	ST_SAME      = "="
-	ST_DIFFERENT = "!"
-	ST_EMPTY     = "!"
-	ST_NOT_THERE = "?"
+	ST_DIFFERENT = "+"
+	ST_EMPTY     = "_"
+	ST_NOT_THERE = "!"
 	ST_NEWER     = ">"
 	ST_OLDER     = "<"
 
@@ -342,20 +358,22 @@ class Engine:
 		elif command == "status":
 			collection = LinksCollection.lookup(".") or LinksCollection(".")
 			self.status(collection)
-		# -- REMOVE command
-		elif command == "update":
+		# -- PUSH or PULL command
+		elif command == "push" or command == "pull":
 			try:
-				optlist, args = getopt.getopt( rest, "fm", ["force", "merge"])
+				optlist, args = getopt.getopt( rest, "fmd", ["force", "merge", "difftool"])
 			except Exception, e:
 				return self.logger.error(e)
 			self.forceUpdate = False
 			for opt, arg in optlist:
 				if opt in ('-f', '--force'):
 					self.forceUpdate = True
+				if opt in ('-d', '--difftool'):
+					raise Exception("--difftool option not implemented yet")
 				if opt in ('-m', '--merge'):
 					raise Exception("--merge option not implemented yet")
 			collection = LinksCollection.lookup(".") or LinksCollection(".")
-			self.update(collection, *args)
+			self.update(command, collection, *args)
 		# -- REMOVE command
 		elif command == "remove":
 			try:
@@ -433,8 +451,9 @@ class Engine:
 			except Exception, e:
 				self.logger.error(e)
 
-	def update( self, collection, *links ):
+	def update( self, command, collection, *links ):
 		"""Updates the given links, or all if no link is specified."""
+		assert command in ("push", "pull")
 		col_links = collection.getLinks()
 		dst_links = map(lambda x:x[1], col_links)
 		if not col_links:
@@ -453,14 +472,27 @@ class Engine:
 			# is not empty
 			if links and not (l in links):
 				continue
-			if content == self.ST_NOT_THERE or content == self.ST_EMPTY \
-			or content == self.ST_DIFFERENT and date != self.ST_NEWER:
-				self.logger.message("Updating ", make_relative(l,"."))
-				self.updateLink(collection, l)
-			elif content == self.ST_DIFFERENT:
-				self.logger.warning("Skipping update", make_relative(l,"."), "(file has local modifications)")
+			if command == "pull":
+				if content == self.ST_NOT_THERE or content == self.ST_EMPTY \
+				or content == self.ST_DIFFERENT and date != self.ST_NEWER:
+					self.logger.message("Updating from origin ", make_relative(l,"."))
+					self.pullLink(collection, l)
+				elif content == self.ST_DIFFERENT:
+					# FIXME: Should do a merge
+					self.logger.warning("Skipping update", make_relative(l,"."), "(file has local modifications)")
+				else:
+					self.logger.message("Link is already up to date: ", make_relative(l,"."))
 			else:
-				self.logger.message("Link is up to date: ", make_relative(l,"."))
+				if   content == self.ST_NOT_THERE or content == self.ST_EMPTY:
+					self.logger.message("Link destination destination was removed or is empty, keeping origin")
+				elif content == self.ST_DIFFERENT and date == self.ST_NEWER:
+					# FIXME: Should do a merge
+					self.logger.message("Updating origin from", make_relative(l,"."))
+					self.pushLink(collection, l)
+				elif content == self.ST_DIFFERENT and date != self.ST_NEWER:
+					self.logger.warning("Skipping update", make_relative(l,"."), "(origin is newer)")
+				else:
+					self.logger.message("Link is already up to date: ", make_relative(l,"."))
 
 	def remove( self, collection, links, delete=False ):
 		"""Remove the given list of links from the collection."""
@@ -497,7 +529,7 @@ class Engine:
 		if s_tme > d_tme: res_1 = self.ST_OLDER
 		return (res_0, res_1)
 
-	def updateLink( self, collection, link, force=False ):
+	def pullLink( self, collection, link, force=False ):
 		"""Updates the given link to the content of the link source"""
 		c, d = self.linkStatus(collection, link)
 		if not force and (not (c in (self.ST_EMPTY, self.ST_NOT_THERE)) and d != self.ST_SAME):
@@ -506,6 +538,17 @@ class Engine:
 		path, content = self.resolveLink(collection, e_link)
 		shutil.copyfile(path,e_link)
 		shutil.copystat(path,e_link)
+
+	def pushLink( self, collection, link, force=False ):
+		"""Updates the given link to the content of the link source"""
+		c, d = self.linkStatus(collection, link)
+		print c, d
+		if not force and (c in (self.ST_EMPTY, self.ST_NOT_THERE) or d == self.ST_OLDER):
+			raise RuntimeError(ERR_ORIGIN_IS_NEWER % (link))
+		e_link = expand_path(link)
+		path, content = self.resolveLink(collection, e_link)
+		shutil.copyfile(e_link, path)
+		shutil.copystat(e_link, path)
 
 	def resolveLink( self, collection, link ):
 		"""Returns ta couple ('path', 'content') corresponding to the resolution
