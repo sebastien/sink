@@ -8,7 +8,7 @@
 # License           :   BSD License (revised)
 # -----------------------------------------------------------------------------
 # Creation date     :   09-Dec-2003
-# Last mod.         :   29-Sep-2009
+# Last mod.         :   30-Sep-2009
 # -----------------------------------------------------------------------------
 # Notes             :   NodeStates SHOULD not be created directly, because they
 #                       MUST be cached (signature and location) in their
@@ -16,7 +16,7 @@
 #                       tracker.
 # -----------------------------------------------------------------------------
 
-import os, hashlib, stat, time, fnmatch, getopt, simplejson, uuid
+import os, hashlib, stat, time, fnmatch, getopt, simplejson
 
 # Error messages
 
@@ -276,7 +276,7 @@ class NodeState:
 		return str(self.getContentSignature())+"-"+str(self.getAttributesSignature())
 	
 	def __repr__(self):
-		return os.path.basename(self.location()) + " " + repr(self._tags)
+		return self.location()
 		
 #------------------------------------------------------------------------------
 #
@@ -384,6 +384,13 @@ class DirectoryNodeState(NodeState):
 		NodeState._appendToWalkPath(self, walkPath)
 		for child in self._children: child._appendToWalkPath(walkPath)
 
+	def iterateDescendants( self ):
+		for child in self._children:
+			yield child
+			if child.hasChildren():
+				for descendant in child.iterateDescendants():
+					yield descendant
+
 	def walkChildren( self, function, context=None ):
 		"""Applies the given function to every child of this node."""
 		for child in self._children:
@@ -433,20 +440,11 @@ class DirectoryNodeState(NodeState):
 		self._contentSignature = hashlib.sha1("".join(children)).hexdigest()
 
 	def __repr__(self):
-		def indent(text, value = "  ", firstLine=False):
-			res = ""
-			for line in text.split("\n"):
-					if firstLine:
-						res += value + line + "\n"
-					else:
-						firstLine = True
-						res += line + "\n"
-			return res
-		name = "[ ] " + NodeState.__repr__(self) + "\n"
+		res = [self.location()]
 		for child in self._children:
-				name += " +-- " + indent(repr(child), "     ", False)		
-		return name
-	
+			res.append (child.__repr__())
+		return "\n".join(res)
+
 #------------------------------------------------------------------------------
 #
 #  FileNodeState
@@ -559,6 +557,14 @@ class State:
 	creating node objects (NodeStates) that represent the file system state at a
 	particular moment.. These nodes can be later queried by location and
 	signature."""
+
+	@staticmethod
+	def FromJSONFile( path ):
+		assert os.path.exists(path)
+		f = file(path, 'r')
+		d = f.read()
+		f.close()
+		return State.FromDict(simplejson.loads(d))
 
 	@staticmethod
 	def FromDict( data ):
@@ -688,7 +694,8 @@ class State:
 
 	def cacheNodeStates( self ):
 		assert self.root()
-		for node in self.root().walkNodeStates():
+		self.cacheNodeState(self.root())
+		for node in self.root().iterateDescendants():
 			if not node.isCached():
 				self.cacheNodeState(node)
 
@@ -1013,7 +1020,6 @@ class Engine:
 		rejects  = self.rejects
 		show     = self.show
 		diffs    = self.diffs
-		command, arguments = arguments[0], arguments[1:]
 		# We extract the arguments
 		try:
 			optlist, args = getopt.getopt( arguments, "cthVvln:iarsmNo",\
@@ -1096,18 +1102,25 @@ class Engine:
 		origin_path    = args[0]
 		compared_paths = args[1:]
 		# Wensures that the origin and compared directories exist
-		if not os.path.isdir(origin_path):
+		if not os.path.exists(origin_path):
 			logger.error("Origin directory does not exist.") ; return -1
 		for path in compared_paths:
-			if not os.path.isdir(path):
+			if not os.path.exists(path):
 				logger.error("Compared directory does not exist.") ; return -1
 
 		# Detects changes between source and destination
 		tracker         = Tracker()
-		origin_state    = State(origin_path, accepts=accepts, rejects=rejects)
+		# FIXME: Support accepts and rejects
+		if os.path.isfile(origin_path):
+			origin_state = State.FromJSONFile(origin_path)
+		else:
+			origin_state = State(origin_path, accepts=accepts, rejects=rejects)
 		compared_states = []
 		for path in compared_paths:
-			compared_states.append(State(path, accepts=accepts, rejects=rejects))
+			if os.path.isfile(path):
+				compared_states.append(State.FromJSONFile(path))
+			else:
+				compared_states.append(State(path, accepts=accepts, rejects=rejects))
 
 		# Scans the source and destination, and updates
 		#logger.message("Scanning origin: " + origin_path)
@@ -1126,13 +1139,6 @@ class Engine:
 				changes.append(tracker.detectChanges(state, origin_state,
 				method=Tracker.TIME))
 			any_changes = changes[-1].anyChanges() or any_changes
-		
-		print "==================="
-		f = file("pouet.data", "w")
-		import simplejson
-		f.write((simplejson.dumps(origin_state.exportToDict())))
-		print "==================="
-		assert None
 		# We apply the operation
 		if any_changes:
 			self.listChanges(
