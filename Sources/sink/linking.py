@@ -250,7 +250,7 @@ sink -l init [PATH]
 
   There are no options for this command.
 
-sink -l add [OPTIONS] SOURCE DESTINATION
+sink -l add [OPTIONS] SOURCE* DESTINATION
 
   Creates a link from the the SOURCE to the DESTINATION. The DESTINATION must
   be contained in a directory where the 'link init' command was run.
@@ -350,10 +350,18 @@ class Engine:
 				if opt in ('-w', '--writable'):
 					self.linksReadOnly = False
 					raise Exception("--writable not implemented yet")
-			if len(args) != 2:
+			if len(args) < 2:
 				return self.logger.error("Adding a link requires a SOURCE and DESTINATION")
 			collection = LinksCollection.lookup(".") or LinksCollection(".")
-			self.add(collection, args[0], args[1])
+			dest       = args[-1]
+			if len(args) == 2:
+				self.add(collection, args[0], args[1])
+			else:
+				if not os.path.isdir(dest):
+					return self.logger.error("DESTINATION must be a directory when given multiple files")
+				for source in args[:-1]:
+					dest_path = os.path.join(dest, os.path.basename(source))
+					self.add(collection, source, dest_path)
 		# -- STATUS command
 		elif command == "status":
 			collection = LinksCollection.lookup(".") or LinksCollection(".")
