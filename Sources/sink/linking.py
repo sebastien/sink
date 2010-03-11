@@ -41,7 +41,8 @@ ERR_ORIGIN_IS_NEWER = "Origin is newer, update has to be forced: %s"
 
 def expand_path( path ):
 	"""Completely expands the given path (vars, user and make it absolute)."""
-	return os.path.abspath(os.path.expandvars(os.path.expanduser(path)))
+	assert type(path) in (str, unicode), "String expected:%s" % (path)
+	return os.path.expandvars(os.path.expanduser(path))
 
 def path_is_child( path, parent ):
 	"""Returns 'True' if the given 'path' is a child of the given 'parent'
@@ -131,6 +132,14 @@ class LinksCollection:
 		form."""
 		n_destination = self._normalizeDestination(destination)
 		return self.links.get(n_destination)
+	
+	def expand( self, path ):
+		"""Expands the given path, which will be interepreted as relative to this links collection root"""
+		path = expand_path(path)
+		if os.path.abspath(path) != path:
+			return os.path.abspath(os.path.join(self.root, path))
+		else:
+			return path
 
 	def _normalizeDestination( self, destination ):
 		"""Normalizes the destination path, making it relative to the
@@ -484,7 +493,7 @@ class Engine:
 				if content == self.ST_NOT_THERE or content == self.ST_EMPTY \
 				or content == self.ST_DIFFERENT and date != self.ST_NEWER:
 					self.logger.message("Updating from origin ", make_relative(l,"."))
-					self.pullLink(collection, l)
+					self.pullLink(collection, l, self.forceUpdate)
 				elif content == self.ST_DIFFERENT:
 					# FIXME: Should do a merge
 					self.logger.warning("Skipping update", make_relative(l,"."), "(file has local modifications)")
@@ -518,7 +527,7 @@ class Engine:
 		'ST_NOT_THERE' and 'FILE_STATUS' is any of 'ST_SAME, ST_NEWER,
 		ST_OLDER'."""
 		source = collection.getSource(link)
-		source_path = expand_path(source)
+		source_path = collection.expand(source)
 		if not source_path or not os.path.exists(source_path):
 			raise RuntimeError(ERR_SOURCE_NOT_FOUND % (link, source))
 		source_path, s_content = self._read(source_path)
@@ -564,7 +573,7 @@ class Engine:
 		
 		The return value is the same as the '_read' method."""
 		source = collection.getSource(link)
-		return self._read(expand_path(source))
+		return self._read(collection.expand(source))
 
 	def _read( self, path, getContent=True ):
 		"""Resolves the given path and returns a couple '(path, content)' when
