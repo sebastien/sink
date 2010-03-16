@@ -496,7 +496,7 @@ class Engine:
 					self.pullLink(collection, l, self.forceUpdate)
 				elif content == self.ST_DIFFERENT:
 					# FIXME: Should do a merge
-					self.logger.warning("Skipping update", make_relative(l,"."), "(file has local modifications)")
+					self.logger.warning("Skipping update of", make_relative(l,"."), "(file has local modifications)")
 				else:
 					self.logger.message("Link is already up to date: ", make_relative(l,"."))
 			else:
@@ -549,7 +549,8 @@ class Engine:
 	def pullLink( self, collection, link, force=False ):
 		"""Updates the given link to the content of the link source"""
 		c, d = self.linkStatus(collection, link)
-		if not force and (not (c in (self.ST_EMPTY, self.ST_NOT_THERE)) and d != self.ST_SAME):
+		#if not force and (not (c in (self.ST_EMPTY, self.ST_NOT_THERE)) and d != self.ST_SAME):
+		if not force and (d == self.ST_NEWER and not (c==self.ST_EMPTY or c==self.ST_NOT_THERE)):
 			raise RuntimeError(ERR_LINK_IS_NEWER % (link))
 		e_link = expand_path(link)
 		path, content = self.resolveLink(collection, e_link)
