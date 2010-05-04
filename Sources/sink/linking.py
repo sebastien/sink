@@ -7,7 +7,7 @@
 # License           :   BSD License (revised)
 # -----------------------------------------------------------------------------
 # Creation date     :   23-Jul-2007
-# Last mod.         :   29-Sep-2009
+# Last mod.         :   04-May-2010
 # -----------------------------------------------------------------------------
 
 # TODO: Make it standalone (so it can be intergrated into Mercurial Contrib)
@@ -144,7 +144,7 @@ class LinksCollection:
 	def _normalizeDestination( self, destination ):
 		"""Normalizes the destination path, making it relative to the
 		collection root, and discarding the leading '/'"""
-		e_destination = expand_path(destination)
+		e_destination = self.expand(destination)
 		assert e_destination.startswith(self.root)
 		n_destination = e_destination[len(self.root):]
 		assert n_destination[0] == "/"
@@ -484,32 +484,35 @@ class Engine:
 				))
 		# Then we update the links
 		for s, l in col_links:
-			content, date = self.linkStatus(collection, l)
-			# We ignore the links that are not in the 'links' list, if this list
-			# is not empty
-			if links and not (l in links):
-				continue
-			if command == "pull":
-				if content == self.ST_NOT_THERE or content == self.ST_EMPTY \
-				or content == self.ST_DIFFERENT and date != self.ST_NEWER:
-					self.logger.message("Updating from origin ", make_relative(l,"."))
-					self.pullLink(collection, l, self.forceUpdate)
-				elif content == self.ST_DIFFERENT:
-					# FIXME: Should do a merge
-					self.logger.warning("Skipping update of", make_relative(l,"."), "(file has local modifications)")
+			try:
+				content, date = self.linkStatus(collection, l)
+				# We ignore the links that are not in the 'links' list, if this list
+				# is not empty
+				if links and not (l in links):
+					continue
+				if command == "pull":
+					if content == self.ST_NOT_THERE or content == self.ST_EMPTY \
+					or content == self.ST_DIFFERENT and date != self.ST_NEWER:
+						self.logger.message("Updating from origin ", make_relative(l,"."))
+						self.pullLink(collection, l, self.forceUpdate)
+					elif content == self.ST_DIFFERENT:
+						# FIXME: Should do a merge
+						self.logger.warning("Skipping update of", make_relative(l,"."), "(file has local modifications)")
+					else:
+						self.logger.message("Link is already up to date: ", make_relative(l,"."))
 				else:
-					self.logger.message("Link is already up to date: ", make_relative(l,"."))
-			else:
-				if   content == self.ST_NOT_THERE or content == self.ST_EMPTY:
-					self.logger.message("Link destination destination was removed or is empty, keeping origin")
-				elif content == self.ST_DIFFERENT and date == self.ST_NEWER:
-					# FIXME: Should do a merge
-					self.logger.message("Updating origin from", make_relative(l,"."))
-					self.pushLink(collection, l)
-				elif content == self.ST_DIFFERENT and date != self.ST_NEWER:
-					self.logger.warning("Skipping update", make_relative(l,"."), "(origin is newer)")
-				else:
-					self.logger.message("Link is already up to date: ", make_relative(l,"."))
+					if   content == self.ST_NOT_THERE or content == self.ST_EMPTY:
+						self.logger.message("Link destination destination was removed or is empty, keeping origin")
+					elif content == self.ST_DIFFERENT and date == self.ST_NEWER:
+						# FIXME: Should do a merge
+						self.logger.message("Updating origin from", make_relative(l,"."))
+						self.pushLink(collection, l)
+					elif content == self.ST_DIFFERENT and date != self.ST_NEWER:
+						self.logger.warning("Skipping update", make_relative(l,"."), "(origin is newer)")
+					else:
+						self.logger.message("Link is already up to date: ", make_relative(l,"."))
+			except RuntimeError, e:
+				self.logger.error(str(e))
 
 	def remove( self, collection, links, delete=False ):
 		"""Remove the given list of links from the collection."""
