@@ -3,12 +3,12 @@
 # -----------------------------------------------------------------------------
 # Project           :   Sink
 # -----------------------------------------------------------------------------
-# Author            :   Sebastien Pierre                 <sebastien@type-z.org>
+# Author            :   Sebastien Pierre           <sebastien.pierre@gmail.com>
 # -----------------------------------------------------------------------------
 # License           :   BSD License (revised)
 # -----------------------------------------------------------------------------
 # Creation date     :   09-Dec-2003
-# Last mod.         :   30-Sep-2009
+# Last mod.         :   22-Feb-2012
 # -----------------------------------------------------------------------------
 # Notes             :   NodeStates SHOULD not be created directly, because they
 #                       MUST be cached (signature and location) in their

@@ -3,15 +3,15 @@
 # -----------------------------------------------------------------------------
 # Project           :   Sink
 # -----------------------------------------------------------------------------
-# Author            :   Sebastien Pierre                 <sebastien@type-z.org>
+# Author            :   Sebastien Pierre           <sebastien.pierre@gmail.com>
 # License           :   BSD License (revised)
 # -----------------------------------------------------------------------------
 # Creation date     :   29-Sep-2009
-# Last mod.         :   30-Sep-2009
+# Last mod.         :   22-Feb-2012
 # -----------------------------------------------------------------------------
 
 import os, simplejson
-from sink import tracking
+from sink import diff
 
 #------------------------------------------------------------------------------
 #
@@ -81,13 +81,13 @@ class Engine:
 		# Ensures that the directory exists
 		if os.path.isdir(root_path):
 			# We take a state snapshot of the given directory
-			root_state = tracking.State(root_path, accepts=accepts, rejects=rejects)
+			root_state = diff.State(root_path, accepts=accepts, rejects=rejects)
 			root_state.populate( lambda x: True )
 			print simplejson.dumps(root_state.exportToDict())
 		else:
 			f = file(root_path, 'r')
 			d = simplejson.loads(f.read())
-			print tracking.State.FromDict(d)
+			print diff.State.FromDict(d)
 		return 0
 
 	def usage( self ):

@@ -3,11 +3,11 @@
 # -----------------------------------------------------------------------------
 # Project           :   Sink
 # -----------------------------------------------------------------------------
-# Author            :   Sebastien Pierre                 <sebastien@type-z.org>
+# Author            :   Sebastien Pierre                 <sebastien.pierre@gmail.com>
 # License           :   BSD License (revised)
 # -----------------------------------------------------------------------------
 # Creation date     :   23-Jul-2007
-# Last mod.         :   04-May-2010
+# Last mod.         :   22-Feb-2012
 # -----------------------------------------------------------------------------
 
 # TODO: Make it standalone (so it can be intergrated into Mercurial Contrib)

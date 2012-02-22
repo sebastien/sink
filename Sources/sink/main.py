@@ -2,7 +2,7 @@
 # -----------------------------------------------------------------------------
 # Project           :   Sink                 <http://github.com/sebastien/sink>
 # -----------------------------------------------------------------------------
-# Author            :   Sebastien Pierre                 <sebastien@type-z.org>
+# Author            :   Sebastien Pierre           <sebastien.pierre@gmail.com>
 # License           :   BSD License (revised)
 # -----------------------------------------------------------------------------
 # Creation date     :   03-Dec-2004
@@ -15,12 +15,12 @@ from os.path import basename, dirname, exists
 # We try to import the sink module. If we have trouble, we simply insert the
 # path into the Python path
 try:
-	from sink import track, linking, snapshot
+	from sink import track, link, snap
 except:
 	sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-	from sink import track, linking, snapshot
+	from sink import track, link, snap
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 #------------------------------------------------------------------------------
 #
@@ -81,8 +81,8 @@ Modes:
 
   (diff/-d/--diff)  Lists the changes between two or more directories [default]
   (link/-l/--link)  Manages a links between files
-  (snap/-s/--snap)  Takes snapshot of a directory
-  (help/-h/--help)  Gives detailed help about a specific operation
+  (snap/-s/--snap)  Takes a snapshot of a directory
+  (help/-h/--help)  Shows help (--help diff, --help link, --help snap)
 
 Options:
 
@@ -108,14 +108,14 @@ DEFAULTS = {
 
 OPERATIONS = {
 	"-d":track.Engine,
-	"-l":linking.Engine,
-	"-s":snapshot.Engine,
+	"-l":link.Engine,
+	"-s":snap.Engine,
 	"--diff":track.Engine,
-	"--link":linking.Engine,
-	"--snap":snapshot.Engine,
+	"--link":link.Engine,
+	"--snap":snap.Engine,
 	"diff":track.Engine,
-	"link":linking.Engine,
-	"snap":snapshot.Engine,
+	"link":link.Engine,
+	"snap":snap.Engine,
 	"":track.Engine
 }
 
@@ -176,9 +176,9 @@ def run( arguments, runningPath=".", logger=None ):
 			if   args[1] == "diff":
 				print track.USAGE
 			elif args[1] == "link":
-				print linking.USAGE
+				print link.USAGE
 			elif args[1] == "snap":
-				print snapshot.USAGE
+				print snap.USAGE
 			else:
 				print USAGE
 			return
