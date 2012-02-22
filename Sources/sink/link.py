@@ -3,7 +3,7 @@
 # -----------------------------------------------------------------------------
 # Project           :   Sink
 # -----------------------------------------------------------------------------
-# Author            :   Sebastien Pierre                 <sebastien.pierre@gmail.com>
+# Author            :   Sebastien Pierre           <sebastien.pierre@gmail.com>
 # License           :   BSD License (revised)
 # -----------------------------------------------------------------------------
 # Creation date     :   23-Jul-2007
@@ -238,8 +238,9 @@ class LinksCollection:
 USAGE = """\
 sink [-l|link] COMMAND [ARGUMENT ARGUMENT...]
 
-Creates a platform-independen links database between files. This can be used
-as a replacement to 'ln' when symlinks are not appropriate.
+Creates a platform-independent links database between files, allowing to
+synchronize the files back and forth. This can be used as a replacement to
+'ln' when symlinks are not appropriate.
 
 Commands:
 
@@ -250,32 +251,32 @@ Commands:
    pull   [OPTIONS] [PATH|LINK]         Pulls changes from sources
    push   [OPTIONS] [PATH|LINK]         Pushes changes to source
 
-sink -l init [PATH]
+sink -l init [PATH=.]
 
-  Initialises the link database for the current folder, or the folder at the
-  given PATH. If PATH is omitted, it will use the current folder, or will look
-  for a Mercurial (.hg) or Git (.git) repository in the parent directories, and
-  will use it to store the links database as a 'sinklinks' file.
+   Initialises the link database for the current folder, or the folder at the
+   given PATH. If PATH is omitted, it will use the current folder, or will look
+   for a Mercurial (.hg) or Git (.git) repository in the parent directories, and
+   will use it to store the links database as a `.sinklinks` file.
 
-  There are no options for this command.
+   There are no options for this command.
 
 sink -l add [OPTIONS] SOURCE* DESTINATION
 
-  Creates a link from the the SOURCE to the DESTINATION. The DESTINATION must
-  be contained in a directory where the 'link init' command was run.
+   Creates a link from the the SOURCE to the DESTINATION. The DESTINATION must
+   be contained in a directory where the 'link init' command was run.
 
-  Options:
+   Options:
 
-    -w, --writable    Link will be made writable (so that you can update them)
+     -w, --writable    Link will be made writable (so that you can update them)
 
 sink -l remove LINK [LINK..]
 
-    Removes one or more link from the link database. The links destinations
-    won't be removed from the filesystem unlesse you specify '--delete'.
+   Removes one or more link from the link database. The links destinations
+   won't be removed from the filesystem unlesse you specify '--delete'.
 
-    Options:
+   Options:
 
-      -d, --delete      Deletes the link destination (your local file)
+     -d, --delete      Deletes the link destination (your local file)
 
 sink -l status [PATH|LINK]...
 
@@ -303,7 +304,7 @@ sink -l pull [OPTIONS] [PATH|LINK]...
 
 sink -l push [OPTIONS] [PATH|LINK]...
 
-    Same as pull, but updates the origin according to your local version.
+   Same as pull, but updates the origin according to your local version.
 
    Options:
 

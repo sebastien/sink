@@ -15,10 +15,10 @@ from os.path import basename, dirname, exists
 # We try to import the sink module. If we have trouble, we simply insert the
 # path into the Python path
 try:
-	from sink import track, link, snap
+	from sink import diff, link, snap
 except:
 	sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-	from sink import track, link, snap
+	from sink import diff, link, snap
 
 __version__ = "1.0.1"
 
@@ -99,7 +99,7 @@ Examples:
 """ % (__version__)
 
 DEFAULTS = {
-	"sink.mode"       : track.CONTENT_MODE,
+	"sink.mode"       : diff.CONTENT_MODE,
 	"sink.diff"       : "diff -u",
 	"sink.whitespace" : True,
 	"filters.accepts" : [],
@@ -107,16 +107,16 @@ DEFAULTS = {
 }
 
 OPERATIONS = {
-	"-d":track.Engine,
+	"-d":diff.Engine,
 	"-l":link.Engine,
 	"-s":snap.Engine,
-	"--diff":track.Engine,
+	"--diff":diff.Engine,
 	"--link":link.Engine,
 	"--snap":snap.Engine,
-	"diff":track.Engine,
+	"diff":diff.Engine,
 	"link":link.Engine,
 	"snap":snap.Engine,
-	"":track.Engine
+	"":diff.Engine
 }
 
 def run( arguments, runningPath=".", logger=None ):
@@ -174,7 +174,7 @@ def run( arguments, runningPath=".", logger=None ):
 	if not args or args[0] in ('-h', '--help'):
 		if len(args) == 2:
 			if   args[1] == "diff":
-				print track.USAGE
+				print diff.USAGE
 			elif args[1] == "link":
 				print link.USAGE
 			elif args[1] == "snap":
