@@ -595,7 +595,7 @@ class State:
 
 		By default, no root node is created, you can create one with the
 		'populate' method."""
-		# Signatures and locations are used by the change tracking system
+		# Signatures and locations are used by the change track system
 		# Signatures is a map with signatures as key and a list of file system
 		# nodes as values.
 		self._contentSignatures = {}
@@ -680,7 +680,7 @@ class State:
 	def cacheNodeState( self, node ):
 		"""Caches a node information in this state. This registers the node
 		signature and location so that it can be processed by the change
-		tracking."""
+		track."""
 		self._locations[node.location()] = node
 		result = None
 		# We make sure that the singature exists
@@ -730,7 +730,7 @@ class State:
 
 #------------------------------------------------------------------------------
 #
-#  Change tracking
+#  Change track
 #
 #------------------------------------------------------------------------------
 

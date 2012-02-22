@@ -15,10 +15,10 @@ from os.path import basename, dirname, exists
 # We try to import the sink module. If we have trouble, we simply insert the
 # path into the Python path
 try:
-	from sink import tracking, linking, snapshot
+	from sink import track, linking, snapshot
 except:
 	sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-	from sink import tracking, linking, snapshot
+	from sink import track, linking, snapshot
 
 __version__ = "1.0.0"
 
@@ -79,27 +79,27 @@ Usage:    sink [MODE] [OPTIONS]
 
 Modes:
 
-  (diff/-d/--diff)    Lists the changes between two or more directories
-  (link/-l/--link)    Manages a links between files
-  (snap/-s/--snap)    Takes snapshot of a directory
-  (help/-h/--help)    Gives detailed help about a specific operation
+  (diff/-d/--diff)  Lists the changes between two or more directories [default]
+  (link/-l/--link)  Manages a links between files
+  (snap/-s/--snap)  Takes snapshot of a directory
+  (help/-h/--help)  Gives detailed help about a specific operation
 
 Options:
 
-  See 'sink --help changes' and 'sink --help link' for more information
+  See `sink --help diff`, `sink --help link`, etc. for more information
   about each mode options.
 
 Examples:
 
-   sink DIR1 DIR2 DIR3           Compares the contents of DIR1, DIR2 and DIR3
-   sink -n1 DIR1 DIR2            Shows difference between version of file 1
-                                 in the listing given by 'sink DIR1 DIR2'
-   sink --only '*.py' D1 D2      Comparens the '*.py' files in D1 and D2
+  $ sink diff DIR1 DIR2 DIR3       Compares the contents of DIR1, DIR2 and DIR3
+
+                                   in the listing given by 'sink DIR1 DIR2'
+  $ sink diff --only '*.py' D1 D2  Compares the '*.py' files in D1 and D2
 
 """ % (__version__)
 
 DEFAULTS = {
-	"sink.mode"       : tracking.CONTENT_MODE,
+	"sink.mode"       : track.CONTENT_MODE,
 	"sink.diff"       : "diff -u",
 	"sink.whitespace" : True,
 	"filters.accepts" : [],
@@ -107,16 +107,16 @@ DEFAULTS = {
 }
 
 OPERATIONS = {
-	"-d":tracking.Engine,
+	"-d":track.Engine,
 	"-l":linking.Engine,
 	"-s":snapshot.Engine,
-	"--diff":tracking.Engine,
+	"--diff":track.Engine,
 	"--link":linking.Engine,
 	"--snap":snapshot.Engine,
-	"diff":tracking.Engine,
+	"diff":track.Engine,
 	"link":linking.Engine,
 	"snap":snapshot.Engine,
-	"":tracking.Engine
+	"":track.Engine
 }
 
 def run( arguments, runningPath=".", logger=None ):
@@ -174,7 +174,7 @@ def run( arguments, runningPath=".", logger=None ):
 	if not args or args[0] in ('-h', '--help'):
 		if len(args) == 2:
 			if   args[1] == "diff":
-				print tracking.USAGE
+				print track.USAGE
 			elif args[1] == "link":
 				print linking.USAGE
 			elif args[1] == "snap":
