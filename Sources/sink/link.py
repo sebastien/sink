@@ -238,9 +238,11 @@ class LinksCollection:
 USAGE = """\
 sink [-l|link] COMMAND [ARGUMENT ARGUMENT...]
 
-Creates a platform-independent links database between files, allowing to
-synchronize the files back and forth. This can be used as a replacement to
-'ln' when symlinks are not appropriate.
+Creates a platform-independent links database (`.sinklinks`) between files,
+allowing to synchronize the files back and forth. In essence, sink links allows
+to easily synchronize individual files across multiple repositorie, without
+having to use symlinks. Also, as sink link file reference can contain environment
+variables, you don't have to hard-code specific locations in your filesystem.
 
 Commands:
 
@@ -251,7 +253,7 @@ Commands:
    pull   [OPTIONS] [PATH|LINK]         Pulls changes from sources
    push   [OPTIONS] [PATH|LINK]         Pushes changes to source
 
-sink -l init [PATH=.]
+sink link init [PATH=.]
 
    Initialises the link database for the current folder, or the folder at the
    given PATH. If PATH is omitted, it will use the current folder, or will look
@@ -260,7 +262,7 @@ sink -l init [PATH=.]
 
    There are no options for this command.
 
-sink -l add [OPTIONS] SOURCE* DESTINATION
+sink link add [OPTIONS] SOURCE* DESTINATION
 
    Creates a link from the the SOURCE to the DESTINATION. The DESTINATION must
    be contained in a directory where the 'link init' command was run.
@@ -269,7 +271,7 @@ sink -l add [OPTIONS] SOURCE* DESTINATION
 
      -w, --writable    Link will be made writable (so that you can update them)
 
-sink -l remove LINK [LINK..]
+sink link remove LINK [LINK..]
 
    Removes one or more link from the link database. The links destinations
    won't be removed from the filesystem unlesse you specify '--delete'.
@@ -278,14 +280,14 @@ sink -l remove LINK [LINK..]
 
      -d, --delete      Deletes the link destination (your local file)
 
-sink -l status [PATH|LINK]...
+sink link status [PATH|LINK]...
 
    Returns the status of the given links. If no link is given, the status of
    all links will be returned. When no argument is given, the current
    directory (or one of its parent) must contain a link database, otherwise
    you should give a PATH containing a link databae.
 
-sink -l pull [OPTIONS] [PATH|LINK]...
+sink link pull [OPTIONS] [PATH|LINK]...
 
    Updates the given local links in the current or given PATH, or updates only the
    given list of LINKs (they must belong to the same link DB, accessible from
@@ -302,9 +304,10 @@ sink -l pull [OPTIONS] [PATH|LINK]...
      -f, --force       Forces the update, ignoring local modifications
      -d, --difftool    Overrides your $MERGETOOL
 
-sink -l push [OPTIONS] [PATH|LINK]...
+sink link push [OPTIONS] [PATH|LINK]...
 
-   Same as pull, but updates the origin according to your local version.
+   The opposite of a pull, it updates the origin according to your local
+   version.
 
    Options:
 
