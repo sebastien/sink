@@ -25,7 +25,7 @@
 #
 # Project name. Do not put spaces.
 PROJECT         = Sink
-PROJECT_VERSION = $(shell grep -r  __version__ Sources | head -n1 | cut -d'"' -f2)
+VERSION = $(shell grep -r  __version__ Sources | head -n1 | cut -d'"' -f2)
 PROJECT_STATUS  = RELEASE
 
 DOCUMENTATION   = Documentation
@@ -62,7 +62,7 @@ KIWI            = $(shell which kiwi)
 
 # Useful variables____________________________________________________________
 
-CURRENT_ARCHIVE = $(PROJECT)-$(PROJECT_VERSION).tar.gz
+CURRENT_ARCHIVE = $(PROJECT)-$(VERSION).tar.gz
 # This is the project name as lower case, used in the install rule
 project_lower   = $(shell echo $(PROJECT) | tr "A-Z" "a-z")
 # The installation prefix, used in the install rule
@@ -93,7 +93,7 @@ all: prepare clean check test doc dist
 	@echo "Making everything for $(PROJECT)"
 
 info:
-	@echo "$(PROJECT)-$(PROJECT_VERSION) ($(PROJECT_STATUS))"
+	@echo "$(PROJECT)-$(VERSION) ($(PROJECT_STATUS))"
 	@echo Source file lines:
 	@wc -l $(SOURCE_FILES)
 
@@ -130,14 +130,20 @@ test: $(SOURCE_FILES) $(TEST_FILES)
 	@$(PYTHON) $(TEST_MAIN)
 
 dist:
-	@echo "Creating archive $(DISTRIBUTION)/$(PROJECT)-$(PROJECT_VERSION).tar.gz"
-	@mkdir -p $(DISTRIBUTION)/$(PROJECT)-$(PROJECT_VERSION)
-	@cp -r $(DISTROCONTENT) $(DISTRIBUTION)/$(PROJECT)-$(PROJECT_VERSION)
-	@make -C $(DISTRIBUTION)/$(PROJECT)-$(PROJECT_VERSION) clean
-	@make -C $(DISTRIBUTION)/$(PROJECT)-$(PROJECT_VERSION) doc
-	@tar cfz $(DISTRIBUTION)/$(PROJECT)-$(PROJECT_VERSION).tar.gz \
-	-C $(DISTRIBUTION) $(PROJECT)-$(PROJECT_VERSION)
-	@rm -rf $(DISTRIBUTION)/$(PROJECT)-$(PROJECT_VERSION)
+	@echo "Creating archive $(DISTRIBUTION)/$(PROJECT)-$(VERSION).tar.gz"
+	@mkdir -p $(DISTRIBUTION)/$(PROJECT)-$(VERSION)
+	@cp -r $(DISTROCONTENT) $(DISTRIBUTION)/$(PROJECT)-$(VERSION)
+	@make -C $(DISTRIBUTION)/$(PROJECT)-$(VERSION) clean
+	@make -C $(DISTRIBUTION)/$(PROJECT)-$(VERSION) doc
+	@tar cfz $(DISTRIBUTION)/$(PROJECT)-$(VERSION).tar.gz \
+	-C $(DISTRIBUTION) $(PROJECT)-$(VERSION)
+	@rm -rf $(DISTRIBUTION)/$(PROJECT)-$(VERSION)
+
+release: $(PRODUCT)
+	git commit -a -m "Release $(VERSION)"
+	git tag $(VERSION) ; true
+	git push --all ; true
+	python setup.py clean sdist register upload
 
 doc: $(DOCS)
 	@echo "Generating $(PROJECT) documentation"

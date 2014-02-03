@@ -16,7 +16,7 @@
 #                       tracker.
 # -----------------------------------------------------------------------------
 
-import os, hashlib, stat, time, fnmatch, getopt, simplejson
+import os, hashlib, stat, time, fnmatch, getopt, json
 
 # Error messages
 
@@ -42,7 +42,7 @@ class NodeState:
 	REMOVED  = "-"
 	MODIFIED = "m"
 	COUNTER  = 0
-	
+
 	@staticmethod
 	def FromDict( state, data ):
 		assert state
@@ -111,11 +111,11 @@ class NodeState:
 	def isDirectory( self ):
 		"""Tells wether the node is a directory or not."""
 		return False
-	
+
 	def hasChildren( self ):
 		"""Tells if this node has any children."""
 		return 0
-	
+
 	def children( self ):
 		"""Returns the children of this node."""
 		return ()
@@ -126,11 +126,11 @@ class NodeState:
 		if self._parent:
 			function(self._parent)
 			self._parent.doOnParents(function)
-	
+
 	def usesSignature( self ):
 		"""Tells wether this node should copmute its SHA-1 signature when updated."""
 		return self._usesSignature
-	
+
 	def _appendToWalkPath( self, walkPath ):
 		"""Appends this node to the given walk path. This allows to iterate
 		nodes using the given `walkPath', which is a list."""
@@ -274,10 +274,10 @@ class NodeState:
 		attributes signature, separated by a dash."""
 		assert self.usesSignature(), "Node does not use signature:" + str(self)
 		return str(self.getContentSignature())+"-"+str(self.getAttributesSignature())
-	
+
 	def __repr__(self):
 		return self.location()
-		
+
 #------------------------------------------------------------------------------
 #
 #  DirectoryNodeState
@@ -310,13 +310,13 @@ class DirectoryNodeState(NodeState):
 	def isDirectory( self ):
 		"""Returns True."""
 		return True
-	
+
 	def hasChildren( self ):
 		return len(self._children)
-	
+
 	def children( self ):
 		return self._children
-	
+
 	def _belongsToState( self, state ):
 		"""Sets the given state as this node state. This invalidates makes the
 		node uncached."""
@@ -567,7 +567,7 @@ class State:
 		f = file(path, 'r')
 		d = f.read()
 		f.close()
-		return State.FromDict(simplejson.loads(d))
+		return State.FromDict(json.loads(d))
 
 	@staticmethod
 	def FromDict( data ):
@@ -922,7 +922,7 @@ class Tracker:
 		state and not in the old one."""
 		node.tag(event=NodeState.ADDED)
 		node.doOnParents(lambda x:x.tag("event") == None and x.tag(event=NodeState.MODIFIED))
-	
+
 	def onModified(self, newNode, oldNode):
 		"""Handler called when a node was modified, ie. it is not the same in
 		the new and in the old state."""
@@ -980,7 +980,7 @@ Legend:
 [=] no changes         [+] file added           [>] changed/newer
                        [-] file removed         [<] changed/older
                        -!- file missing
-""" 
+"""
 
 CONTENT_MODE = True
 TIME_MODE    = False
@@ -1021,7 +1021,7 @@ class Engine:
 		"modified",
 		"time", "content", "ignore-spaces", "ignorespaces", "diff=", "ignore=",
 		"ignores=", "accept=", "accepts=", "filter", "only="])
-		
+
 	def configure( self, arguments ):
 		# We extract the arguments
 		optlist, args = self._parseOptions(arguments)

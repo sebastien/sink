@@ -10,7 +10,7 @@
 # Last mod.         :   22-Feb-2012
 # -----------------------------------------------------------------------------
 
-import os, simplejson
+import os, json
 from sink import diff
 
 #------------------------------------------------------------------------------
@@ -34,7 +34,7 @@ Options:
   --ignore-spaces        Ignores the spaces when analyzing the content
   --ignore   GLOBS       Ignores the files that match the glob
   --only     GLOBS       Only accepts the file that match glob
-  
+
 Examples:
 
   Taking a snapshot of the state of /etc
@@ -49,7 +49,7 @@ Examples:
 
   $ sink -c etc-20090930.json etc-20091001.json
 
-""" 
+"""
 
 class Engine:
 	"""Implements operations used by the Sink main command-line interface."""
@@ -83,10 +83,10 @@ class Engine:
 			# We take a state snapshot of the given directory
 			root_state = diff.State(root_path, accepts=accepts, rejects=rejects)
 			root_state.populate( lambda x: True )
-			print simplejson.dumps(root_state.exportToDict())
+			print json.dumps(root_state.exportToDict())
 		else:
 			f = file(root_path, 'r')
-			d = simplejson.loads(f.read())
+			d = json.loads(f.read())
 			print diff.State.FromDict(d)
 		return 0
 
