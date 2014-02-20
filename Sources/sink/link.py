@@ -14,6 +14,11 @@
 
 import os, sys, hashlib, stat, getopt, shutil
 
+# TODO: Should store a hash in the link to see if the link has local changes,
+# as otherwise pull will automatically erase the link
+# TODO: Make links non-writable by default
+# TODO: Implement support for writable
+
 #------------------------------------------------------------------------------
 #
 #  Exceptions
@@ -42,7 +47,7 @@ ERR_ORIGIN_IS_NEWER = "Origin is newer, update has to be forced: %s"
 def expand_path( path ):
 	"""Completely expands the given path (vars, user and make it absolute)."""
 	assert type(path) in (str, unicode), "String expected:%s" % (path)
-	return os.path.expandvars(os.path.expanduser(path))
+	return os.path.abspath(os.path.expandvars(os.path.expanduser(path)))
 
 def path_is_child( path, parent ):
 	"""Returns 'True' if the given 'path' is a child of the given 'parent'
@@ -85,6 +90,41 @@ DB_FILE     = ".sinklinks"
 DB_FILE_HG  = os.path.join(".hg",  "sinklinks")
 DB_FILE_GIT = os.path.join(".git", "sinklinks")
 
+class Link:
+
+	@classmethod
+	def Parse( self, data, link=None ):
+		data        = data.split("\t")
+		source      = data[0]
+		destination = data[1]
+		writable    = False
+		lastHash    = None
+		link        = None
+		if len(data) >= 3:
+			writable = data[2] == "w"
+		if len(data) >= 4:
+			lastHash = data[3]
+		if link == None:
+			link = Link(source, destination, writable, lastHash)
+		else:
+			link.source      = source
+			link.destination = destination
+			link.writable    = writable
+			link.lastHash    = lastHash
+		return link
+
+	def __init__( self, source, destination, writable, lastHash=None ):
+		self.source      = source
+		self.destination = destination
+		self.writable    = writable
+		self.lastHash    = lastHash
+	
+	def export( self ):
+		return "%s\t%s\t%s\t%s" % (self.source, self.destination, self.writable or "_", self.lastHash or "_")
+
+	def __str__( self ):
+		return self.export()
+
 class LinksCollection:
 
 	@staticmethod
@@ -110,7 +150,7 @@ class LinksCollection:
 
 	def __init__( self, root, dbfile=DB_FILE ):
 		"""Creates a new link collection object, using the given root."""
-		self.links = {}
+		self.links = []
 		root  = expand_path(root)
 		if not os.path.exists(root):
 			raise LinksCollectionError(CFG_BAD_ROOT)
@@ -123,15 +163,18 @@ class LinksCollection:
 		"""Returns a list of '(source, dest)' where source and dest are absolute
 		_expanded paths_ representing the link source and destination."""
 		res = []
-		for d, s in self.links.items():
-			res.append(map(expand_path,(s,os.path.join(self.root,d))))
+		for link in self.links:
+			res.append(map(expand_path,(link.source, os.path.join(self.root, link.destination))))
 		return res
 
 	def getSource( self, destination ):
 		"""Returns the source for the given destination, in its _unexpanded_
 		form."""
 		n_destination = self._normalizeDestination(destination)
-		return self.links.get(n_destination)
+		for _ in self.links:
+			if self._normalizeDestination(_.destination) == n_destination:
+				return _.source
+		return None
 	
 	def expand( self, path ):
 		"""Expands the given path, which will be interepreted as relative to this links collection root"""
@@ -145,13 +188,13 @@ class LinksCollection:
 		"""Normalizes the destination path, making it relative to the
 		collection root, and discarding the leading '/'"""
 		e_destination = self.expand(destination)
-		assert e_destination.startswith(self.root)
+		assert e_destination.startswith(self.root), "Destination does not start with root '%s': '%s'" % (self.root, e_destination)
 		n_destination = e_destination[len(self.root):]
-		assert n_destination[0] == "/"
+		assert n_destination[0] == "/", "Destiantion path should start with a  /: '%s'" % (n_destination)
 		n_destination = n_destination[1:]
 		return n_destination
 
-	def registerLink( self, source, destination ):
+	def registerLink( self, source, destination, writable=False, lastHash=None ):
 		"""Registers a link from the given source path to the given destination.
 		*Source* is stored as-is (meaning that variables *won't be expanded*), and
 		*destination will be expanded* and be expressed relatively to the
@@ -164,18 +207,18 @@ class LinksCollection:
 		if not path_is_child(e_destination, self.root):
 			raise LinksCollectionError(CFG_NOT_A_CHILD % (self.root))
 		n_destination = self._normalizeDestination(e_destination)
-		self.links[n_destination] = source
+		self.links.append(Link(source, n_destination, writable, lastHash))
 		return e_destination, source
 
-	def removeLink( self, link, delete=False ):
+	def removeLink( self, destination, delete=False ):
 		"""Removes the link from this link collection. The file is only delete
 		if the delete option is True."""
-		assert self.getSource(link)
-		e_link = expand_path(link)
-		n_link = self._normalizeDestination(e_link)
-		if delete and os.path.exists(e_link):
-			os.unlink(e_link)
-		del self.links[n_link]
+		assert self.getSource(destination), "No source found for: %s" % (destination)
+		e_destination = expand_path(destination)
+		n_destination = self._normalizeDestination(e_destination)
+		if delete and os.path.exists(n_destination):
+			os.unlink(n_destination)
+		self.links = filter(lambda _:_.destination != n_destination, self.links)
 
 	def save( self ):
 		"""Saves the link collection to the 'dbpath()' file."""
@@ -206,11 +249,12 @@ class LinksCollection:
 			elif command == "links":
 				links_count = int(args[0])
 			elif command == "link":
-				self.links[args[0]] = args[1]
-		assert len(self.links.items()) == links_count
+				link = Link.Parse("\t".join(args))
+				self.links.append(link)
+		assert len(self.links) == links_count, "Links count do not match: %s != %s" % (len(self.links), links_count)
 
 	def dbpath( self ):
-		"""Returns the absolute patht ot the DB file."""
+		"""Returns the absolute path ot the DB file."""
 		return expand_path(os.path.join(self.root, self.dbfile))
 
 	def exists( self ):
@@ -224,8 +268,8 @@ class LinksCollection:
 		res.append("root:\t%s" % (self.root))
 		res.append("dbfile:\t%s" % (self.dbfile))
 		res.append("links:\t%s" % (len(self.links)))
-		for d,s in self.links.items():
-			res.append("link:\t%s\t%s" % (d,s))
+		for link in self.links:
+			res.append("link:\t%s\t%s" % (link.destination,link.source))
 		res.append("# EOF")
 		return "\n".join(res)
 
@@ -362,7 +406,7 @@ class Engine:
 			for opt, arg in optlist:
 				if opt in ('-w', '--writable'):
 					self.linksReadOnly = False
-					raise Exception("--writable not implemented yet")
+					# raise Exception("--writable not implemented yet")
 			if len(args) < 2:
 				return self.logger.error("Adding a link requires a SOURCE and DESTINATION")
 			collection = LinksCollection.lookup(".") or LinksCollection(".")
@@ -463,7 +507,7 @@ class Engine:
 			src_max  = max(len(s), src_max)
 			links.append([s, l])
 		links.sort()
-		template = "[%s] %-" + str(link_max) + "s  %-s  %" + str(src_max) + "s"
+		template = "[%s] %-" + str(link_max) + "s  %-s  %-" + str(src_max) + "s"
 		for s, l in links:
 			try:
 				content, date = self.linkStatus(collection, l)
@@ -474,7 +518,7 @@ class Engine:
 
 	def update( self, command, collection, *links ):
 		"""Updates the given links, or all if no link is specified."""
-		assert command in ("push", "pull")
+		assert command in ("push", "pull"), "Command should be 'push' or 'pull', got %s" % (command)
 		col_links = collection.getLinks()
 		dst_links = map(lambda x:x[1], col_links)
 		if not col_links:
@@ -567,7 +611,6 @@ class Engine:
 	def pushLink( self, collection, link, force=False ):
 		"""Updates the given link to the content of the link source"""
 		c, d = self.linkStatus(collection, link)
-		print c, d
 		if not force and (c in (self.ST_EMPTY, self.ST_NOT_THERE) or d == self.ST_OLDER):
 			raise RuntimeError(ERR_ORIGIN_IS_NEWER % (link))
 		e_link = expand_path(link)
