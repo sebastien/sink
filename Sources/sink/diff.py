@@ -8,7 +8,7 @@
 # License           :   BSD License (revised)
 # -----------------------------------------------------------------------------
 # Creation date     :   09-Dec-2003
-# Last mod.         :   22-Feb-2012
+# Last mod.         :   12-Feb-2016
 # -----------------------------------------------------------------------------
 # Notes             :   NodeStates SHOULD not be created directly, because they
 #                       MUST be cached (signature and location) in their
@@ -24,9 +24,15 @@ BAD_DOCUMENT_ELEMENT = "Bad document element"
 NO_LOCATION = "No `location' attribute."
 UNKNOWN_ELEMENT = "Unknown element %s"
 
+def is_dir( path, resolveLink=True ):
+	return os.path.isdir(os.readlink(path) if resolveLink and os.path.islink(path) else path)
+
+def is_file( path, resolveLink=True ):
+	return os.path.isfile(os.readlink(path) if resolveLink and os.path.islink(path) else path)
+
 #------------------------------------------------------------------------------
 #
-#  File system node
+#  FILE SYSTEM NODE
 #
 #------------------------------------------------------------------------------
 
@@ -292,7 +298,8 @@ class DirectoryNodeState(NodeState):
 
 		Same operations as the file system node."""
 		# The list of child nodes
-		self._children = []
+		self._children     = []
+		self._skipSymlinks = False
 		NodeState.__init__(self, state, location, usesSignature=False,
 		accepts=accepts, rejects=rejects, data=data )
 
@@ -358,9 +365,9 @@ class DirectoryNodeState(NodeState):
 			element_loc = os.path.join( self.location(), element_loc )
 			abs_element_loc = self._state.getAbsoluteLocation(element_loc)
 			# Skips symlinks
-			if os.path.islink( abs_element_loc):
+			if self._skipSymlinks and os.path.islink( abs_element_loc):
 				continue
-			elif os.path.isdir( abs_element_loc ):
+			elif is_dir( abs_element_loc ):
 				node = DirectoryNodeState( self._state, element_loc,
 				accepts=self._accepts, rejects=self._rejects )
 				node.update(nodeSignatureFilter)
@@ -1122,14 +1129,14 @@ class Engine:
 		# Detects changes between source and destination
 		tracker         = Tracker()
 		# FIXME: Support accepts and rejects
-		if os.path.isfile(origin_path):
+		if is_file(origin_path):
 			origin_state = State.FromJSONFile(origin_path)
 		else:
 			origin_state = State(origin_path, accepts=accepts, rejects=rejects)
 			origin_state.populate( lambda x: self.mode )
 		compared_states = []
 		for path in compared_paths:
-			if os.path.isfile(path):
+			if is_file(path):
 				compared_states.append(State.FromJSONFile(path))
 			else:
 				state = State(path, accepts=accepts, rejects=rejects)
