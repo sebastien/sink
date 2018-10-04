@@ -15,10 +15,10 @@ from os.path import basename, dirname, exists
 # We try to import the sink module. If we have trouble, we simply insert the
 # path into the Python path
 try:
-	from sink import diff, link, snap
+	from sink import diff, snap
 except:
 	sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-	from sink import diff, link, snap
+	from sink import diff, snap
 
 __version__ = "1.0.1"
 
@@ -80,13 +80,12 @@ Usage:    sink [MODE] [OPTIONS]
 Modes:
 
   (diff/-d/--diff)  Lists the changes between two or more directories [default]
-  (link/-l/--link)  Manages a links between files
   (snap/-s/--snap)  Takes a snapshot of a directory
-  (help/-h/--help)  Shows help (--help diff, --help link, --help snap)
+  (help/-h/--help)  Shows help (--help diff, --help snap)
 
 Options:
 
-  See `sink --help diff`, `sink --help link`, etc. for more information
+  See `sink --help diff`, `sink --help snap`, etc. for more information
   about each mode options.
 
 Examples:
@@ -108,13 +107,10 @@ DEFAULTS = {
 
 OPERATIONS = {
 	"-d":diff.Engine,
-	"-l":link.Engine,
 	"-s":snap.Engine,
 	"--diff":diff.Engine,
-	"--link":link.Engine,
 	"--snap":snap.Engine,
 	"diff":diff.Engine,
-	"link":link.Engine,
 	"snap":snap.Engine,
 	"":diff.Engine
 }
@@ -175,8 +171,6 @@ def run( arguments, runningPath=".", logger=None ):
 		if len(args) == 2:
 			if   args[1] == "diff":
 				print diff.USAGE
-			elif args[1] == "link":
-				print link.USAGE
 			elif args[1] == "snap":
 				print snap.USAGE
 			else:
