@@ -210,18 +210,21 @@ class NodeState:
 	def _updateAttributes( self ):
 		"""Gathers the attributes related to this file system node."""
 		path = self.getAbsoluteLocation()
-		assert self.exists()
-		stat_info = map(lambda x:str(x), os.stat(path))
-		self._attributes["Size"] = stat_info[stat.ST_SIZE]
-		self._attributes["Creation"] = stat_info[stat.ST_CTIME]
-		self._attributes["Modification"] = stat_info[stat.ST_MTIME]
-		self._attributes["Owner"] = stat_info[stat.ST_UID]
-		self._attributes["Group"] = stat_info[stat.ST_GID]
-		self._attributes["Permissions"] = stat_info[stat.ST_MODE]
+		if os.path.exists(path):
+			stat_info = map(lambda x:str(x), os.stat(path))
+			self._attributes["Size"] = stat_info[stat.ST_SIZE]
+			self._attributes["Creation"] = stat_info[stat.ST_CTIME]
+			self._attributes["Modification"] = stat_info[stat.ST_MTIME]
+			self._attributes["Owner"] = stat_info[stat.ST_UID]
+			self._attributes["Group"] = stat_info[stat.ST_GID]
+			self._attributes["Permissions"] = stat_info[stat.ST_MODE]
+		else:
+			pass
+			#self.logger.error("File does not exist: {0}".format(path))
 
 	def getAttribute( self, info ):
 		"""Returns the attributes information with the given name"""
-		return self._attributes[info]
+		return self._attributes.get(info)
 
 	def getAttributes( self ):
 		"""Returns the attributes of this node."""
@@ -341,7 +344,9 @@ class DirectoryNodeState(NodeState):
 		to the local file system, so new nodes are always created for new
 		directories and files."""
 		# We ensure that the directory exists
-		assert self.exists()
+		if not self.exists():
+			# Was an assert
+			return
 		# We retrieve an order list of the directory content
 		try:
 			content = os.listdir(self.getAbsoluteLocation())
