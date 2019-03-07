@@ -9,6 +9,7 @@
 # Last mod.         :   29-Sep-2009
 # -----------------------------------------------------------------------------
 
+from __future__ import print_function
 import os, sys, shutil, getopt, string, ConfigParser
 from os.path import basename, dirname, exists
 
@@ -150,7 +151,7 @@ def run( arguments, runningPath=".", logger=None ):
 					elif val in ("time", "date"):
 						config[key] = TIME_MODE
 					else:
-						print "Expected 'content' or 'time': ", val
+						print ("Expected 'content' or 'time': ", val)
 				elif key == "sink.whitespace":
 					if val == "ignore":
 						config[key] = False
@@ -163,24 +164,24 @@ def run( arguments, runningPath=".", logger=None ):
 				elif key == "sink.diff":
 					config[key] = val.strip()
 				else:
-					print "Invalid configuration option:", key
+					print ("Invalid configuration option:", key)
 
 	# If there is no arguments
 	args = arguments
 	if not args or args[0] in ('-h', '--help'):
 		if len(args) == 2:
 			if   args[1] == "diff":
-				print diff.USAGE
+				print (diff.USAGE)
 			elif args[1] == "snap":
-				print snap.USAGE
+				print (snap.USAGE)
 			else:
-				print USAGE
+				print (USAGE)
 			return
 		else:
-			print USAGE
+			print (USAGE)
 			return
 	elif args[0] == '--version':
-		print __version__
+		print (__version__)
 		return
 	elif args[0] in OPERATIONS.keys():
 		engine = OPERATIONS[args[0]](logger, config)

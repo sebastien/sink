@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Encoding: iso-8859-1
+# Encoding: utf-8
 # -----------------------------------------------------------------------------
 # Project           :   Sink
 # -----------------------------------------------------------------------------
@@ -16,6 +16,7 @@
 #                       tracker.
 # -----------------------------------------------------------------------------
 
+from __future__ import print_function
 import os, hashlib, stat, time, fnmatch, getopt, json
 
 # Error messages
@@ -1040,9 +1041,9 @@ class Engine:
 		# We parse the options
 		for opt, arg in optlist:
 			if opt in ('-h', '--help'):
-				print USAGE ; return 0
+				print (USAGE) ; return 0
 			elif opt in ('-v', '--version'):
-				print __version__
+				print (__version__)
 				return 0
 			elif opt in ('-c', '--content'):
 				self.mode   = CONTENT_MODE
@@ -1261,8 +1262,8 @@ class Engine:
 				else:
 					src = src.getAbsoluteLocation()
 					dst = dst.getAbsoluteLocation()
-					self.logger.message("Diff: '%s' --> '%s'" % (src,dst))
-					command = '%s %s %s' % ( diffcommand,src,dst)
+					self.logger.message("Diff: '%s' → '%s'" % (src,dst))
+					command = diffcommand.format(src,dst)
 					commands_to_execute.append(command)
 			counter += 1
 		# if added:     self.logger.message( "\t%5s were added    [+]" % (len(added)))
@@ -1271,7 +1272,7 @@ class Engine:
 		# if unchanged: self.logger.message( "\t%5s are the same  [=]" % (len(unchanged)))
 		if not all_locations_keys: self.logger.message("No changes found.")
 		for command in commands_to_execute:
-			print ">>", command
+			print (">>", command)
 			os.system(command)
 
 # EOF - vim: sw=4 ts=4 tw=80 noet
