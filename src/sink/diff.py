@@ -212,7 +212,7 @@ class NodeState:
 		"""Gathers the attributes related to this file system node."""
 		path = self.getAbsoluteLocation()
 		if os.path.exists(path):
-			stat_info = map(lambda x:str(x), os.stat(path))
+			stat_info = [str(_) for _ in os.stat(path)]
 			self._attributes["Size"] = stat_info[stat.ST_SIZE]
 			self._attributes["Creation"] = stat_info[stat.ST_CTIME]
 			self._attributes["Modification"] = stat_info[stat.ST_MTIME]
@@ -259,14 +259,13 @@ class NodeState:
 		self._contentSignature = None
 
 		# Updates the attributes signature
-		items = self._attributes.items()
-		items.sort()
+		items = sorted(self._attributes.items())
 		signature = []
 		for key, value in items:
 			# Creation attribute does not appear in the attributes signature
 			if self._attributeInSignature(key):
 				signature.append(str(key)+str(value))
-		self._attributesSignature = hashlib.sha1("".join(signature)).hexdigest()
+		self._attributesSignature = hashlib.sha1(bytes("".join(signature), "utf8")).hexdigest()
 
 	def getContentSignature( self ):
 		if self._contentSignature == None: self._updateSignature()
@@ -284,6 +283,9 @@ class NodeState:
 		attributes signature, separated by a dash."""
 		assert self.usesSignature(), "Node does not use signature:" + str(self)
 		return str(self.getContentSignature())+"-"+str(self.getAttributesSignature())
+
+	def __lt__(self, value):
+		return self.location() < value.location()
 
 	def __repr__(self):
 		return self.location()
@@ -386,7 +388,7 @@ class DirectoryNodeState(NodeState):
 			if node: self.appendChild(node)
 		# This is VERY IMPORTANT : we ensure that the children are canonicaly
 		# sorted
-		self._children.sort(lambda x,y: cmp(x.location(), y.location()))
+		self._children = sorted(self._children, key=lambda _:_.location())
 		# We can only update the node after children were added, see
 		# _updateSignature
 		NodeState.update(self)
@@ -453,7 +455,8 @@ class DirectoryNodeState(NodeState):
 		children = []
 		for child in self.getChildren():
 			children.append(os.path.basename(child.location()))
-		self._contentSignature = hashlib.sha1("".join(children)).hexdigest()
+		content = bytes("".join(children), "utf8")
+		self._contentSignature = hashlib.sha1(content).hexdigest()
 
 	def __repr__(self):
 		res = [self.location()]
@@ -478,12 +481,10 @@ class FileNodeState(NodeState):
 		"""Returns the data contained in this file as a string."""
 		fd = None
 		try:
-			fd = open(self.getAbsoluteLocation(), "r")
-			assert fd!=None
-			data = fd.read()
-			fd.close()
+			with open(self.getAbsoluteLocation(), "rb") as f:
+				return f.read()
 		except IOError:
-			data = ""
+			data = b""
 		return data
 
 	def _updateSignature( self ):
@@ -763,8 +764,8 @@ def sets( firstSet, secondSet, objectAccessor=lambda x:x ):
 	element itself."""
 
 	# We precompute the maps
-	set_first_acc  = map(objectAccessor, firstSet)
-	set_second_acc = map(objectAccessor, secondSet)
+	set_first_acc  = [objectAccessor(_) for _ in  firstSet]
+	set_second_acc = [objectAccessor(_) for _ in secondSet]
 
 	# Declare the filtering predicates
 	# First set elements not in second set
@@ -775,9 +776,11 @@ def sets( firstSet, secondSet, objectAccessor=lambda x:x ):
 	def common(x): return objectAccessor(x) in set_second_acc
 
 	# Compute the result
-	return	filter(first_only, firstSet),\
-			filter(second_only, secondSet),\
-			filter(common, firstSet)
+	return	(
+		[_ for  _ in firstSet if first_only(_)],
+		[_ for  _ in secondSet if second_only(_)],
+		[_ for  _ in firstSet if common(_)],
+	)
 
 class Change:
 	"""A change represents differences between two states."""
@@ -1057,7 +1060,7 @@ class Engine:
 				self.accepts.extend(arg.split("."))
 			elif opt == '-d':
 				if arg.find(":") == -1: diff, _dir = int(arg), 0
-				else: diff, _dir = map(int, arg.split(":"))
+				else: diff, _dir = [int(_) for _ in arg.split(":")]
 				self.diffs.append((diff, _dir))
 			elif opt == '--difftool':
 				self.diff_command = arg
@@ -1116,7 +1119,7 @@ class Engine:
 
 		try:
 			args = self.configure(arguments)
-		except Exception, e:
+		except Exception as e:
 			return logger.error(e)
 
 		# We ensure that there are enough arguments
@@ -1186,9 +1189,9 @@ class Engine:
 			added     = change.getOnlyInNewState()
 			changed   = change.getModified()
 			unchanged = change.getUnmodified()
-			added.sort(lambda a,b:cmp(a.location(), b.location()))
-			removed.sort(lambda a,b:cmp(a.location(), b.location()))
-			changed.sort(lambda a,b:cmp(a.location(), b.location()))
+			added = sorted(added, key=lambda _:_.location())
+			removed = sorted(removed, key=lambda _:_.location())
+			changed = sorted(changed, key=lambda _:_.location())
 			for node in added:
 				if not show.get(ADDED): break
 				if node.isDirectory(): continue
@@ -1218,8 +1221,7 @@ class Engine:
 				locations[node.location()] = SAME
 			all_locations.append(locations)
 		# Now we print the result
-		all_locations_keys = all_locations_keys.keys()
-		all_locations_keys.sort(lambda a,b:cmp((a.count("/"),a),(b.count("/"), b)))
+		all_locations_keys = sorted(all_locations_keys.keys(), key=lambda _:(_.count(_), _))
 		format  = "%0" + str(len(str(len(all_locations_keys))) ) + "d %s %s"
 		counter = 0
 		def find_diff( num ):

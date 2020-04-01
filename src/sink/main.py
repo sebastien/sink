@@ -10,7 +10,7 @@
 # -----------------------------------------------------------------------------
 
 from __future__ import print_function
-import os, sys, shutil, getopt, string, ConfigParser
+import os, sys, shutil, getopt, string, configparser
 from os.path import basename, dirname, exists
 
 # We try to import the sink module. If we have trouble, we simply insert the
@@ -73,7 +73,7 @@ class Logger:
 USAGE = """\
 sink (%s)
 
-Sink is the swiss army-knife for many common directory comparison and 
+Sink is the swiss army-knife for many common directory comparison and
 synchronization.
 
 Usage:    sink [MODE] [OPTIONS]
@@ -139,7 +139,7 @@ def run( arguments, runningPath=".", logger=None ):
 	config = DEFAULTS.copy()
 	config_path = os.path.expanduser("~/.sinkrc")
 	if os.path.isfile(config_path):
-		parser = ConfigParser.ConfigParser()
+		parser = configparser.ConfigParser()
 		parser.read(config_path)
 		for section in parser.sections():
 			for option in parser.options(section):
@@ -158,9 +158,9 @@ def run( arguments, runningPath=".", logger=None ):
 					else:
 						config[key] = True
 				elif key == "filters.accepts":
-					config["filters.accepts"].extend(map(string.strip, val.split(",")))
+					config["filters.accepts"].extend([_.strip() for _ in val.split(",")])
 				elif key in ("filters.rejects", "filters.reject", "filters.ignore", "filters.ignores"):
-					config["filters.rejects"].extend(map(string.strip, val.split(",")))
+					config["filters.rejects"].extend([_.strip() for _ in val.split(",")])
 				elif key == "sink.diff":
 					config[key] = val.strip()
 				else:

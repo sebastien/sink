@@ -68,14 +68,13 @@ class Engine:
 		accepts  = []
 		rejects  = []
 		if not arguments:
-			print self.usage()
+			print (self.usage())
 			return -1
 		#arguments = arguments[0], arguments[1:]
 		args = arguments
 		# We ensure that there are enough arguments
 		if len(args) != 1:
-			print args
-			logger.error("Bad number of arguments\n" + USAGE)
+			logger.error(f"Bad number of arguments, got {args}\n" + USAGE)
 			return -1
 		root_path = args[0]
 		# Ensures that the directory exists
@@ -83,11 +82,11 @@ class Engine:
 			# We take a state snapshot of the given directory
 			root_state = diff.State(root_path, accepts=accepts, rejects=rejects)
 			root_state.populate( lambda x: True )
-			print json.dumps(root_state.exportToDict())
+			json.dump(root_state.exportToDict(), sys.stdout)
 		else:
 			f = file(root_path, 'r')
 			d = json.loads(f.read())
-			print diff.State.FromDict(d)
+			print (diff.State.FromDict(d))
 		return 0
 
 	def usage( self ):
