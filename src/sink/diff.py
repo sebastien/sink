@@ -1022,13 +1022,14 @@ class Engine:
 
 	def setup( self, config ):
 		"""Sets up the engine using the given configuration object."""
+		if os.environ.get("DIFF"):
+			self.diff_command = os.environ.get("DIFF")
 		self.mode          = config["sink.mode"]
 		self.diff_command  = config["sink.diff"]
 		self.diffs         = []
 		self.accepts       = config["filters.accepts"]
 		self.rejects       = config["filters.rejects"]
 		self.ignore_spaces = config["sink.whitespace"]
-		if os.environ.get("DIFF"): self.diff_command = os.environ.get("DIFF")
 		self.show          = {}
 
 	def _parseOptions( self, arguments ):
