@@ -10,7 +10,6 @@
 # -----------------------------------------------------------------------------
 
 from distutils.core import setup
-import sys
 
 SUMMARY = "Multiple directory change detection and synchronization"
 DESCRIPTION = """\

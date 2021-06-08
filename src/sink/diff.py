@@ -1148,7 +1148,6 @@ class Engine:
                 self.show[OLDER] = True
             else:
                 nargs.append(arg)
-        args = nargs
         # We set the default values for the show, only if there was no + option
         if self.show == {} or filter(lambda x: not x, self.show.values()):
             for key, value in {ADDED: True, REMOVED: True, NEWER: True, OLDER: True,
