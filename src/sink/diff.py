@@ -1090,10 +1090,10 @@ class Engine:
         for opt, arg in optlist:
             if opt in ('-h', '--help'):
                 print(USAGE)
-                return 0
+                return []
             elif opt in ('-v', '--version'):
                 print(__version__)
-                return 0
+                return []
             elif opt in ('-c', '--content'):
                 self.mode = CONTENT_MODE
             elif opt in ('-t', '--time'):

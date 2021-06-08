@@ -70,7 +70,7 @@ and we compare the three directories:
 ```bash
 $ sink diff sink-r1 sink-r2 sink-r3
 No differences
-```bash
+```
 
 as the three directories are the same, we'll put them to different revisions:
 
