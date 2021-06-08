@@ -1,0 +1,3 @@
+appenv_declare sink
+appenv_prepend PATH $APPENV_DIR/bin
+appenv_prepend PYTHONPATH $APPENV_DIR/src

@@ -1,3 +1,5 @@
 #!/usr/bin/python
-import sys, sink.main
+import sys
+import sink.main
 sink.main.run(sys.argv[1:])
+# EOF

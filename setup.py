@@ -1,20 +1,18 @@
 #!/usr/bin/python
-# Encoding: ISO-8859-1
 # -----------------------------------------------------------------------------
 # Project           :   Sink
 # -----------------------------------------------------------------------------
 # Author            :   Sebastien Pierre                 <sebastien@type-z.org>
 # License           :   Revised BSD License
 # -----------------------------------------------------------------------------
-# Creation date     :   20-Mar-2005
-# Last mod.         :   25-Jul-2006
+# Creation date     :   2005-04-20
+# Last mod.         :   2021-07-25
 # -----------------------------------------------------------------------------
 
-import sys ; sys.path.insert(0, "Sources")
-from sink import main
 from distutils.core import setup
+import sys
 
-SUMMARY     = "Multiple directory change detection and synchronization"
+SUMMARY = "Multiple directory change detection and synchronization"
 DESCRIPTION = """\
 Sink allows easy and fast comparison of multiple repositories, compared to one
 "origin" directory. Sink then allows to easily bind actions to the various
@@ -29,31 +27,31 @@ copies of a single directory.
 # ------------------------------------------------------------------------------
 
 setup(
-    name        = "sink",
-    version     = main.__version__,
-    author      = "Sebastien Pierre", author_email = "sebastien@type-z.org",
-    description = SUMMARY, long_description = DESCRIPTION,
-    license     = "Revised BSD License",
-    keywords    = "change detection, synchronization",
-    url         = "http://github.com/sebastien/sink",
-    download_url= "http://github.com/sebastien/sink/tarball/master",
-    package_dir = { "": "Sources" },
-    packages    = ["sink"],
-    scripts     = ["Scripts/sink"],
-    classifiers = [
-      "Development Status :: 4 - Beta",
-      "Environment :: Web Environment",
-      "Intended Audience :: Developers",
-      "Intended Audience :: Information Technology",
-      "License :: OSI Approved :: BSD License",
-      "Natural Language :: English",
-      "Topic :: System :: Archiving :: Backup",
-      "Topic :: System :: Archiving :: Mirroring",
-      "Topic :: System :: Filesystems",
-      "Topic :: Utilities",
-      "Operating System :: POSIX",
-      "Operating System :: Microsoft :: Windows",
-      "Programming Language :: Python",
+    name="sink",
+    version="1.1.0",
+    author="Sebastien Pierre", author_email="sebastien@type-z.org",
+    description=SUMMARY, long_description=DESCRIPTION,
+    license="Revised BSD License",
+    keywords="change detection, synchronization",
+    url="http://github.com/sebastien/sink",
+    download_url="http://github.com/sebastien/sink/tarball/master",
+    package_dir={"": "src"},
+    packages=["sink"],
+    scripts=["bin/sink"],
+    classifiers=[
+        "Development Status :: 4 - Beta",
+        "Environment :: Web Environment",
+        "Intended Audience :: Developers",
+        "Intended Audience :: Information Technology",
+        "License :: OSI Approved :: BSD License",
+        "Natural Language :: English",
+        "Topic :: System :: Archiving :: Backup",
+        "Topic :: System :: Archiving :: Mirroring",
+        "Topic :: System :: Filesystems",
+        "Topic :: Utilities",
+        "Operating System :: POSIX",
+        "Operating System :: Microsoft :: Windows",
+        "Programming Language :: Python",
     ]
 )
 
