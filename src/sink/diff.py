@@ -24,6 +24,7 @@ import time
 import fnmatch
 import getopt
 import json
+from pathlib import Path
 
 # Error messages
 
@@ -33,11 +34,26 @@ UNKNOWN_ELEMENT = "Unknown element %s"
 
 
 def is_dir(path, resolveLink=True):
-    return os.path.isdir(os.readlink(path) if resolveLink and os.path.islink(path) else path)
+    return os.path.isdir(
+        os.readlink(path) if resolveLink and os.path.islink(path) else path
+    )
 
 
 def is_file(path, resolveLink=True):
-    return os.path.isfile(os.readlink(path) if resolveLink and os.path.islink(path) else path)
+    return os.path.isfile(
+        os.readlink(path) if resolveLink and os.path.islink(path) else path
+    )
+
+
+GITCONFIG_PATH = Path(os.path.expanduser("~/.gitignore"))
+GITIGNORE: list[str] = []
+if GITCONFIG_PATH.exists():
+    with open(GITCONFIG_PATH, "rt") as f:
+        for pattern in f.readlines():
+            pattern = pattern.strip().rstrip("\n")
+            if pattern.startswith("#"):
+                continue
+            GITIGNORE.append(pattern)
 
 # ------------------------------------------------------------------------------
 #
@@ -47,7 +63,12 @@ def is_file(path, resolveLink=True):
 
 
 FILE_SYSTEM_ATTRIBUTES = (
-    "Size", "Creation", "Modification", "Owner", "Group", "Permissions",
+    "Size",
+    "Creation",
+    "Modification",
+    "Owner",
+    "Group",
+    "Permissions",
 )
 
 
@@ -71,8 +92,9 @@ class NodeState:
         else:
             assert None, "Unsupported type: %s" % (data["type"])
 
-    def __init__(self, state, location, usesSignature=True, accepts=(),
-                 rejects=(), data=None):
+    def __init__(
+        self, state, location, usesSignature=True, accepts=(), rejects=(), data=None
+    ):
         """Creates a file system node with the given location. The location
         is relative to the state root. The usesSignature parameter allows to
         specify wether the node should use a signature or not. Large file nodes may take
@@ -88,7 +110,7 @@ class NodeState:
         self._state = None
         self._cached = False
         self._accepts = accepts
-        self._rejects = rejects
+        self._rejects = rejects or GITIGNORE
         self._attributes = {}
         self._tags = {}
         self._contentSignature = None
@@ -233,7 +255,7 @@ class NodeState:
             self._attributes["Permissions"] = stat_info[stat.ST_MODE]
         else:
             pass
-            #self.logger.error("File does not exist: {0}".format(path))
+            # self.logger.error("File does not exist: {0}".format(path))
 
     def getAttribute(self, info):
         """Returns the attributes information with the given name"""
@@ -276,9 +298,10 @@ class NodeState:
         for key, value in items:
             # Creation attribute does not appear in the attributes signature
             if self._attributeInSignature(key):
-                signature.append(str(key)+str(value))
+                signature.append(str(key) + str(value))
         self._attributesSignature = hashlib.sha1(
-            bytes("".join(signature), "utf8")).hexdigest()
+            bytes("".join(signature), "utf8")
+        ).hexdigest()
 
     def getContentSignature(self):
         if self._contentSignature == None:
@@ -297,13 +320,16 @@ class NodeState:
         """Returns the concatenation of the content signature and the
         attributes signature, separated by a dash."""
         assert self.usesSignature(), "Node does not use signature:" + str(self)
-        return str(self.getContentSignature())+"-"+str(self.getAttributesSignature())
+        return (
+            str(self.getContentSignature()) + "-" + str(self.getAttributesSignature())
+        )
 
     def __lt__(self, value):
         return self.location() < value.location()
 
     def __repr__(self):
         return self.location()
+
 
 # ------------------------------------------------------------------------------
 #
@@ -322,8 +348,15 @@ class DirectoryNodeState(NodeState):
         # The list of child nodes
         self._children = []
         self._skipSymlinks = False
-        NodeState.__init__(self, state, location, usesSignature=False,
-                           accepts=accepts, rejects=rejects, data=data)
+        NodeState.__init__(
+            self,
+            state,
+            location,
+            usesSignature=False,
+            accepts=accepts,
+            rejects=rejects,
+            data=data,
+        )
 
     def exportToDict(self):
         result = NodeState.exportToDict(self)
@@ -393,8 +426,12 @@ class DirectoryNodeState(NodeState):
             if self._skipSymlinks and os.path.islink(abs_element_loc):
                 continue
             elif is_dir(abs_element_loc):
-                node = DirectoryNodeState(self._state, element_loc,
-                                          accepts=self._accepts, rejects=self._rejects)
+                node = DirectoryNodeState(
+                    self._state,
+                    element_loc,
+                    accepts=self._accepts,
+                    rejects=self._rejects,
+                )
                 node.update(nodeSignatureFilter)
             else:
                 if nodeSignatureFilter(abs_element_loc):
@@ -451,6 +488,7 @@ class DirectoryNodeState(NodeState):
                 if isinstance(x, atype):
                     return True
             return False
+
         # We execute the filter
         return filter(typefilter, self._children)
 
@@ -486,6 +524,7 @@ class DirectoryNodeState(NodeState):
             res.append(child.__repr__())
         return "\n".join(res)
 
+
 # ------------------------------------------------------------------------------
 #
 #  FileNodeState
@@ -519,6 +558,7 @@ class FileNodeState(NodeState):
         # if self.usesSignature():
         self._contentSignature = hashlib.sha1(self.getData()).hexdigest()
 
+
 # ------------------------------------------------------------------------------
 #
 #  Ancestor guessing
@@ -540,16 +580,16 @@ def guessNodeStateAncestors(node, nodes):
 
     def difference(node, info):
         return abs(int(node.getAttribute(info)) - int(node.getAttribute(info)))
+
     # Initialises the maxima table for the given attributes info
     maxima = {
         "Creation": difference(nodes[0], "Creation"),
-        "Size": difference(nodes[0], "Size")
+        "Size": difference(nodes[0], "Size"),
     }
     # We get the maxima for each attributes info
     for attributes in ("Creation", "Size"):
         for node in nodes:
-            maxima[attributes] = max(
-                maxima[attributes], difference(node, attributes))
+            maxima[attributes] = max(maxima[attributes], difference(node, attributes))
     # We calculate the possible ancestry rate
     result = []
     for node in nodes:
@@ -558,36 +598,32 @@ def guessNodeStateAncestors(node, nodes):
         if node.__class__ == node.__class__:
             node_rate += 0.40
         # Creation rate, up to 25%
-        creation_rate = 0.25 * (1 - float(difference(node, "Creation")) /
-                                maxima["Creation"])
+        creation_rate = 0.25 * (
+            1 - float(difference(node, "Creation")) / maxima["Creation"]
+        )
         # Divided by two if rated node creation date is > to current node
         # creation date
-        if node.getAttribute("Creation") > \
-           node.getAttribute("Creation"):
+        if node.getAttribute("Creation") > node.getAttribute("Creation"):
             creation_rate = creation_rate / 2.0
         node_rate += creation_rate
         # If modification date is < to current modification date, add 15%
-        if node.getAttribute("Modification") < \
-           node.getAttribute("Modification"):
+        if node.getAttribute("Modification") < node.getAttribute("Modification"):
             node_rate += 0.15
         # Size rate, up to 10%
-        node_rate += 0.10 * (1 - float(difference(node, "Size")) /
-                             maxima["Size"])
+        node_rate += 0.10 * (1 - float(difference(node, "Size")) / maxima["Size"])
         # If owner is the same then add 3%
-        if node.getAttribute("Owner") ==\
-           node.getAttribute("Owner"):
+        if node.getAttribute("Owner") == node.getAttribute("Owner"):
             node_rate += 0.03
         # If group is the same then add 3%
-        if node.getAttribute("Group") ==\
-           node.getAttribute("Group"):
+        if node.getAttribute("Group") == node.getAttribute("Group"):
             node_rate += 0.03
         # If permissions are the same then add 3%
-        if node.getAttribute("Permissions") ==\
-           node.getAttribute("Permissions"):
+        if node.getAttribute("Permissions") == node.getAttribute("Permissions"):
             node_rate += 0.03
         result.append((node_rate, node))
     result.sort(lambda x, y: cmp(x[0], y[0]))
     return result
+
 
 # ------------------------------------------------------------------------------
 #
@@ -616,15 +652,16 @@ class State:
             None,
             populate=False,
             accepts=list(data["accepts"]),
-            rejects=list(data["rejects"])
+            rejects=list(data["rejects"]),
         )
         root = NodeState.FromDict(state, root)
         state.root(root)
         state.cacheNodeStates()
         return state
 
-    def __init__(self, rootLocation, rootNodeState=None, populate=False,
-                 accepts=(), rejects=()):
+    def __init__(
+        self, rootLocation, rootNodeState=None, populate=False, accepts=(), rejects=()
+    ):
         """Creates a new state with the given location as the root. If the populate
         variable is set to True, then the state is populated with the data gathered
         from the fielsystem.
@@ -663,7 +700,7 @@ class State:
             "accepts": self._accepts,
             "rejects": self._rejects,
             "rootLocation": self._rootLocation,
-            "rootNodeState": self._rootNodeState and self._rootNodeState.exportToDict()
+            "rootNodeState": self._rootNodeState and self._rootNodeState.exportToDict(),
         }
         return result
 
@@ -695,8 +732,9 @@ class State:
         The nodeSignatureFilter is a predicate which tells if a node at the
         given location should compute its signature or not.
         """
-        rootNodeState = DirectoryNodeState(self, "", accepts=self._accepts,
-                                           rejects=self._rejects)
+        rootNodeState = DirectoryNodeState(
+            self, "", accepts=self._accepts, rejects=self._rejects
+        )
         rootNodeState.update(nodeSignatureFilter)
         self._creationTime = time.localtime()
         self.root(rootNodeState)
@@ -775,6 +813,7 @@ class State:
     def __repr__(self):
         return repr(self.root())
 
+
 # ------------------------------------------------------------------------------
 #
 #  Change track
@@ -803,11 +842,16 @@ def sets(firstSet, secondSet, objectAccessor=lambda x: x):
 
     # Declare the filtering predicates
     # First set elements not in second set
-    def first_only(x): return objectAccessor(x) not in set_second_acc
+    def first_only(x):
+        return objectAccessor(x) not in set_second_acc
+
     # Second set elements not in first set
-    def second_only(x): return objectAccessor(x) not in set_first_acc
+    def second_only(x):
+        return objectAccessor(x) not in set_first_acc
+
     # First sets elements in second set == second set elts in first set
-    def common(x): return objectAccessor(x) in set_second_acc
+    def common(x):
+        return objectAccessor(x) in set_second_acc
 
     # Compute the result
     return (
@@ -837,7 +881,7 @@ class Change:
             self._moved,
             self._removed,
             self._modified,
-            self._unmodified
+            self._unmodified,
         ]
         self.newState = newState
         self.previousState = previousState
@@ -931,7 +975,7 @@ class Tracker:
         new_locations, prev_locations, same_locations = sets(
             newState.nodesByLocation().items(),
             previousState.nodesByLocation().items(),
-            lambda x: x[0]
+            lambda x: x[0],
         )
 
         # TODO: This should be improved with copied and moved files, but this
@@ -969,16 +1013,19 @@ class Tracker:
                     self.onUnmodified(previous_node, node)
 
         # We make sure that we classified every node of the state
-        assert len(new_locations) + len(prev_locations) + len(same_locations)\
+        assert (
+            len(new_locations) + len(prev_locations) + len(same_locations)
             == changes.count()
+        )
         return changes
 
     def onCreated(self, node):
         """Handler called when a node was created, ie. it is present in the new
         state and not in the old one."""
         node.tag(event=NodeState.ADDED)
-        node.doOnParents(lambda x: x.tag("event") ==
-                         None and x.tag(event=NodeState.MODIFIED))
+        node.doOnParents(
+            lambda x: x.tag("event") == None and x.tag(event=NodeState.MODIFIED)
+        )
 
     def onModified(self, newNode, oldNode):
         """Handler called when a node was modified, ie. it is not the same in
@@ -994,6 +1041,7 @@ class Tracker:
         """Handler called when a node was removed, ie. it is not the in
         the new state but is in the old state."""
         node.tag(event=NodeState.REMOVED)
+
 
 # ------------------------------------------------------------------------------
 #
@@ -1077,56 +1125,75 @@ class Engine:
         self.show = {}
 
     def _parseOptions(self, arguments):
-        return getopt.getopt(arguments, "cthVvld:iarsmno",
-                             ["version", "help", "verbose", "list", "checkin", "checkout",
-                              "modified",
-                              "time", "content", "ignore-spaces", "ignorespaces", "diff=", "ignore=",
-                              "ignores=", "accept=", "accepts=", "filter", "only="])
+        return getopt.getopt(
+            arguments,
+            "cthVvld:iarsmno",
+            [
+                "version",
+                "help",
+                "verbose",
+                "list",
+                "checkin",
+                "checkout",
+                "modified",
+                "time",
+                "content",
+                "ignore-spaces",
+                "ignorespaces",
+                "diff=",
+                "ignore=",
+                "ignores=",
+                "accept=",
+                "accepts=",
+                "filter",
+                "only=",
+            ],
+        )
 
     def configure(self, arguments):
         # We extract the arguments
         optlist, args = self._parseOptions(arguments)
         # We parse the options
         for opt, arg in optlist:
-            if opt in ('-h', '--help'):
+            if opt in ("-h", "--help"):
                 print(USAGE)
                 return []
-            elif opt in ('-v', '--version'):
+            elif opt in ("-v", "--version"):
                 print(__version__)
                 return []
-            elif opt in ('-c', '--content'):
+            elif opt in ("-c", "--content"):
                 self.mode = CONTENT_MODE
-            elif opt in ('-t', '--time'):
+            elif opt in ("-t", "--time"):
                 self.mode = TIME_MODE
-            elif opt in ('--ignorespaces', '--ignore-spaces'):
+            elif opt in ("--ignorespaces", "--ignore-spaces"):
                 self.ignore_spaces = True
-            elif opt in ('--ignore', '--ignores'):
+            elif opt in ("--ignore", "--ignores"):
                 self.rejects.extend(arg.split(","))
-            elif opt in ('--only', '--accept', '--accepts'):
+            elif opt in ("--only", "--accept", "--accepts"):
                 self.accepts.extend(arg.split("."))
-            elif opt == '-d':
+            elif opt == "-d":
                 if arg.find(":") == -1:
                     diff, _dir = int(arg), 0
                 else:
                     diff, _dir = [int(_) for _ in arg.split(":")]
                 self.diffs.append((diff, _dir))
-            elif opt == '--difftool':
+            elif opt == "--difftool":
                 self.diff_command = arg
             elif opt == "+A":
                 for t in [ADDED, REMOVED, SAME, NEWER, OLDER]:
                     self.show[t] = False
-            elif opt in ('-a'):
+            elif opt in ("-a"):
                 self.show[ADDED] = False
-            elif opt in ('-r'):
+            elif opt in ("-r"):
                 self.show[REMOVED] = False
-            elif opt in ('-s'):
+            elif opt in ("-s"):
                 self.show[SAME] = False
-            elif opt in ('-m'):
+            elif opt in ("-m"):
                 self.show[NEWER] = False
                 self.show[OLDER] = False
-            elif opt in ('-n'):
+            elif opt in ("-n"):
                 self.show[NEWER] = False
-            elif opt in ('-o'):
+            elif opt in ("-o"):
                 self.show[OLDER] = False
         # We adjust the show
         nargs = []
@@ -1150,8 +1217,13 @@ class Engine:
                 nargs.append(arg)
         # We set the default values for the show, only if there was no + option
         if self.show == {} or filter(lambda x: not x, self.show.values()):
-            for key, value in {ADDED: True, REMOVED: True, NEWER: True, OLDER: True,
-                               SAME: False}.items():
+            for key, value in {
+                ADDED: True,
+                REMOVED: True,
+                NEWER: True,
+                OLDER: True,
+                SAME: False,
+            }.items():
                 self.show.setdefault(key, value)
         return args
 
@@ -1204,19 +1276,25 @@ class Engine:
         changes = []
         any_changes = False
         for state in compared_states:
-            #logger.message("Comparing '%s' to origin" % (state.location()))
+            # logger.message("Comparing '%s' to origin" % (state.location()))
             if self.mode == CONTENT_MODE:
-                changes.append(tracker.detectChanges(state, origin_state,
-                                                     method=Tracker.SHA1))
+                changes.append(
+                    tracker.detectChanges(state, origin_state, method=Tracker.SHA1)
+                )
             else:
-                changes.append(tracker.detectChanges(state, origin_state,
-                                                     method=Tracker.TIME))
+                changes.append(
+                    tracker.detectChanges(state, origin_state, method=Tracker.TIME)
+                )
             any_changes = changes[-1].anyChanges() or any_changes
         # We apply the operation
         if any_changes:
             self.listChanges(
-                changes, origin_state, compared_states,
-                diffs, diffcommand=self.diff_command, show=show
+                changes,
+                origin_state,
+                compared_states,
+                diffs,
+                diffcommand=self.diff_command,
+                show=show,
             )
         else:
             logger.message("No differences")
@@ -1225,7 +1303,9 @@ class Engine:
     def usage(self):
         return USAGE
 
-    def listChanges(self, changes, origin, compared, diffs=[], diffcommand="diff", show=None):
+    def listChanges(
+        self, changes, origin, compared, diffs=[], diffcommand="diff", show=None
+    ):
         """Outputs a list of changes, with files only in source, fiels only in
         destination and modified files."""
         assert show
@@ -1261,10 +1341,11 @@ class Engine:
                 if node.isDirectory():
                     continue
                 all_locations_keys[node.location()] = True
-                old_node = change.previousState.nodeWithLocation(
-                    node.location())
+                old_node = change.previousState.nodeWithLocation(node.location())
                 new_node = change.newState.nodeWithLocation(node.location())
-                if old_node.getAttribute("Modification") < new_node.getAttribute("Modification"):
+                if old_node.getAttribute("Modification") < new_node.getAttribute(
+                    "Modification"
+                ):
                     if not show.get(NEWER):
                         continue
                     locations[node.location()] = NEWER
@@ -1282,7 +1363,8 @@ class Engine:
             all_locations.append(locations)
         # Now we print the result
         all_locations_keys = sorted(
-            all_locations_keys.keys(), key=lambda _: (_.count(_), _))
+            all_locations_keys.keys(), key=lambda _: (_.count(_), _)
+        )
         format = "%0" + str(len(str(len(all_locations_keys)))) + "d %s %s"
         counter = 0
 
@@ -1291,6 +1373,7 @@ class Engine:
                 if _diff == num:
                     return _dir
             return None
+
         commands_to_execute = []
         for loc in all_locations_keys:
             # For the origin, the node is either ABSENT or SAME
@@ -1314,20 +1397,22 @@ class Engine:
                 src = origin.nodeWithLocation(loc)
                 found_diff -= 1
                 if found_diff == -1:
-                    self.logger.message(
-                        "Given DIR is too low, using 1 as default")
+                    self.logger.message("Given DIR is too low, using 1 as default")
                     found_diff = 0
                 if found_diff >= len(compared):
                     self.logger.message(
-                        "Given DIR is too high, using %s as default" % (len(compared)))
-                    found_diff = len(compared)-1
-                dst = compared[found_diff-1].nodeWithLocation(loc)
+                        "Given DIR is too high, using %s as default" % (len(compared))
+                    )
+                    found_diff = len(compared) - 1
+                dst = compared[found_diff - 1].nodeWithLocation(loc)
                 if not src:
                     self.logger.message(
-                        "Cannot diff\nFile only in dest:   " + dst.getAbsoluteLocation())
+                        "Cannot diff\nFile only in dest:   " + dst.getAbsoluteLocation()
+                    )
                 elif not dst:
                     self.logger.message(
-                        "Cannot diff\nFile only in source: " + src.getAbsoluteLocation())
+                        "Cannot diff\nFile only in source: " + src.getAbsoluteLocation()
+                    )
                 else:
                     src = src.getAbsoluteLocation()
                     dst = dst.getAbsoluteLocation()
@@ -1344,5 +1429,6 @@ class Engine:
         for command in commands_to_execute:
             print(">>", command)
             os.system(command)
+
 
 # EOF
