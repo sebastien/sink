@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# Encoding: utf-8
 # -----------------------------------------------------------------------------
 # Project           :   Sink
 # -----------------------------------------------------------------------------
@@ -8,7 +7,7 @@
 # License           :   BSD License (revised)
 # -----------------------------------------------------------------------------
 # Creation date     :   2003-12-09
-# Last mod.         :   2021-06-08
+# Last mod.         :   2022-04-27
 # -----------------------------------------------------------------------------
 # NOTES             :   NodeStates SHOULD not be created directly, because they
 #                       MUST be cached (signature and location) in their
@@ -16,7 +15,6 @@
 #                       tracker.
 # -----------------------------------------------------------------------------
 
-from __future__ import print_function
 import os
 import hashlib
 import stat
@@ -24,6 +22,8 @@ import time
 import fnmatch
 import getopt
 import json
+import re
+from typing import Iterable, NamedTuple, Optional
 from pathlib import Path
 
 # Error messages
@@ -31,6 +31,18 @@ from pathlib import Path
 BAD_DOCUMENT_ELEMENT = "Bad document element"
 NO_LOCATION = "No `location' attribute."
 UNKNOWN_ELEMENT = "Unknown element %s"
+
+
+# NOTE: This is not used yet, but we could use it to validate. Putting
+# this here for documentation primarily.
+RE_INTERACTIVE_DIFF = re.compile(r"(\d+(:\d+))(,\d+(:\d+))*@(\d+(,\d+)*)")
+
+
+class InteractiveDiff(NamedTuple):
+    """Captures information about interactive diff requests"""
+
+    row: int
+    sources: list[int]
 
 
 def is_dir(path, resolveLink=True):
@@ -1107,18 +1119,18 @@ class Engine:
         self.ignore_spaces = True
         self.rejects = []
         self.accepts = []
-        self.diffs = []
+        self.diffs: list[InteractiveDiff] = []
         self.show = {}
         if config:
             self.setup(config)
 
     def setup(self, config):
         """Sets up the engine using the given configuration object."""
-        if os.environ.get("DIFF"):
-            self.diff_command = os.environ.get("DIFF")
+        self.diff_command = config.get(
+            "sink.diff", os.getenv("DIFF", "diff -u {source} {target}")
+        )
         self.mode = config["sink.mode"]
-        self.diff_command = config["sink.diff"]
-        self.diffs = []
+        self.diffs: list[InteractiveDiff] = []
         self.accepts = config["filters.accepts"]
         self.rejects = config["filters.rejects"]
         self.ignore_spaces = config["sink.whitespace"]
@@ -1172,11 +1184,22 @@ class Engine:
             elif opt in ("--only", "--accept", "--accepts"):
                 self.accepts.extend(arg.split("."))
             elif opt == "-d":
-                if arg.find(":") == -1:
-                    diff, _dir = int(arg), 0
+                # We take N,N,N and I:J for ranges
+                # and then @A,B,… where A,B,… are the sources for the diff.
+                if "@" in arg:
+                    prefix, suffix = arg.split("@", 1)
                 else:
-                    diff, _dir = [int(_) for _ in arg.split(":")]
-                self.diffs.append((diff, _dir))
+                    prefix, suffix = arg, "0,1"
+                rows = []
+                for item in arg.split(","):
+                    if ":" in item:
+                        a, b = (int(_) for _ in item.split(":", 1))
+                        rows += [_ for _ in range(a, b + 1)]
+                    else:
+                        rows.append(int(item))
+                diffed = [int(_) for _ in suffix.split(",")]
+                for row in rows:
+                    self.diffs.append(InteractiveDiff(row, diffed))
             elif opt == "--difftool":
                 self.diff_command = arg
             elif opt == "+A":
@@ -1234,7 +1257,7 @@ class Engine:
         accepts = self.accepts
         rejects = self.rejects
         show = self.show
-        diffs = self.diffs
+        diffs: list[InteractiveDiff] = self.diffs
 
         try:
             args = self.configure(arguments)
@@ -1304,13 +1327,23 @@ class Engine:
         return USAGE
 
     def listChanges(
-        self, changes, origin, compared, diffs=[], diffcommand="diff", show=None
+        self,
+        changes,
+        origin: State,
+        compared: list[State],
+        diffs: Iterable[InteractiveDiff] = (),
+        diffcommand: str = "diff",
+        show: Optional[dict[str, bool]] = None,
     ):
-        """Outputs a list of changes, with files only in source, fiels only in
+        """Outputs a list of changes, with files only in source, fields only in
         destination and modified files."""
         assert show
         all_locations = []
         all_locations_keys = {}
+        sources: list[State] = [origin] + compared
+        diff_by_row: dict[int, list[InteractiveDiff]] = {}
+        for d in diffs:
+            diff_by_row.setdefault(d.row, []).append(d)
         # We get the locations by changes
         for change in changes:
             locations = {}
@@ -1368,14 +1401,8 @@ class Engine:
         format = "%0" + str(len(str(len(all_locations_keys)))) + "d %s %s"
         counter = 0
 
-        def find_diff(num):
-            for _diff, _dir in diffs:
-                if _diff == num:
-                    return _dir
-            return None
-
         commands_to_execute = []
-        for loc in all_locations_keys:
+        for i, loc in enumerate(all_locations_keys):
             # For the origin, the node is either ABSENT or SAME
             if origin.nodeWithLocation(loc) == None:
                 state = ABSENT
@@ -1392,33 +1419,39 @@ class Engine:
                 else:
                     state += node
             self.logger.message(format % (counter, state, loc))
-            found_diff = find_diff(counter)
-            if found_diff != None:
-                src = origin.nodeWithLocation(loc)
-                found_diff -= 1
-                if found_diff == -1:
-                    self.logger.message("Given DIR is too low, using 1 as default")
-                    found_diff = 0
-                if found_diff >= len(compared):
-                    self.logger.message(
-                        "Given DIR is too high, using %s as default" % (len(compared))
-                    )
-                    found_diff = len(compared) - 1
-                dst = compared[found_diff - 1].nodeWithLocation(loc)
-                if not src:
-                    self.logger.message(
-                        "Cannot diff\nFile only in dest:   " + dst.getAbsoluteLocation()
-                    )
-                elif not dst:
-                    self.logger.message(
-                        "Cannot diff\nFile only in source: " + src.getAbsoluteLocation()
-                    )
-                else:
-                    src = src.getAbsoluteLocation()
-                    dst = dst.getAbsoluteLocation()
-                    self.logger.message("Diff: '%s' → '%s'" % (src, dst))
-                    command = diffcommand.format(src, dst)
-                    commands_to_execute.append(command)
+            # If that specific number is in the diff list
+            if i in diff_by_row:
+                for d in diff_by_row[i]:
+                    diffed_sources = [
+                        sources[_].nodeWithLocation(loc)
+                        for _ in d.sources
+                        if _ < len(sources)
+                    ]
+                    if len(diffed_sources) < 2:
+                        raise RuntimeError(
+                            "Diffing requires at least two files, got: {len(diff_sources}"
+                        )
+                    elif len(diffed_sources) == 2:
+                        diffed_paths = [
+                            _.getAbsoluteLocation() if _ else "/dev/null"
+                            for _ in diffed_sources
+                        ]
+                        self.logger.message(
+                            f"Diff {loc}: '{diffed_paths[0]}' → {', '.join(diffed_paths[1:])}"
+                        )
+                        kwargs = dict(
+                            source=diffed_paths[0],
+                            compared=diffed_paths[1],
+                            other=diffed_paths[2] if len(diffed_paths) > 2 else "",
+                        )
+                        command: str = diffcommand.format(*kwargs.values(), **kwargs)
+                        commands_to_execute.append(command)
+                    elif len(diffed_sources) == 3:
+                        pass
+                    else:
+                        raise RuntimeError(
+                            f"Diff-{len(diffed_sources)} is not supported for diff {d}"
+                        )
             counter += 1
         # if added:     self.logger.message( "\t%5s were added    [+]" % (len(added)))
         # if removed:   self.logger.message( "\t%5s were removed   ! " % (len(removed)))

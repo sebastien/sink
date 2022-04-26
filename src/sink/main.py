@@ -48,7 +48,7 @@ class Logger:
         self._err = sys.stderr
 
     def error(self, *message):
-        self._write(self._err,  "[ERROR]", *message)
+        self._write(self._err, "[ERROR]", *message)
         return -1
 
     def warning(self, *message):
@@ -60,12 +60,13 @@ class Logger:
         return 0
 
     def info(self, *message):
-        self._write(self._out,  *message)
+        self._write(self._out, *message)
         return 0
 
     def _write(self, stream, *a):
         stream.write(" ".join(map(str, a)) + "\n")
         stream.flush()
+
 
 # ------------------------------------------------------------------------------
 #
@@ -100,14 +101,16 @@ Examples:
                                    in the listing given by 'sink DIR1 DIR2'
   $ sink diff --only '*.py' D1 D2  Compares the '*.py' files in D1 and D2
 
-""" % (__version__)
+""" % (
+    __version__
+)
 
 DEFAULTS = {
     "sink.mode": diff.CONTENT_MODE,
-    "sink.diff": "diff -u",
+    "sink.diff": "diff -u {0} {1} {2}",
     "sink.whitespace": True,
     "filters.accepts": [],
-    "filters.rejects": []
+    "filters.rejects": [],
 }
 
 OPERATIONS = {
@@ -117,11 +120,11 @@ OPERATIONS = {
     "--snap": snap.Engine,
     "diff": diff.Engine,
     "snap": snap.Engine,
-    "": diff.Engine
+    "": diff.Engine,
 }
 
 
-def run(arguments=sys.argv[1:], runningPath=".", logger=None):
+def command(arguments=sys.argv[1:], runningPath=".", logger=None):
     """Runs Sink using the given list of arguments, given either as a
     string or as a list."""
 
@@ -130,7 +133,7 @@ def run(arguments=sys.argv[1:], runningPath=".", logger=None):
     runningPath = os.path.abspath(runningPath)
 
     # If arguments are given as a string, split them
-    if type(arguments) in (type(""), type(u"")):
+    if type(arguments) in (type(""), type("")):
         arguments = arguments.split(" ")
 
     # And the logger
@@ -152,9 +155,9 @@ def run(arguments=sys.argv[1:], runningPath=".", logger=None):
                 val = parser.get(section, option).strip()
                 if key == "sink.mode":
                     if val in ("content", "contents"):
-                        config[key] = CONTENT_MODE
+                        config[key] = diff.CONTENT_MODE
                     elif val in ("time", "date"):
-                        config[key] = TIME_MODE
+                        config[key] = diff.TIME_MODE
                     else:
                         print("Expected 'content' or 'time': ", val)
                 elif key == "sink.whitespace":
@@ -164,10 +167,17 @@ def run(arguments=sys.argv[1:], runningPath=".", logger=None):
                         config[key] = True
                 elif key == "filters.accepts":
                     config["filters.accepts"].extend(
-                        [_.strip() for _ in val.split(",")])
-                elif key in ("filters.rejects", "filters.reject", "filters.ignore", "filters.ignores"):
+                        [_.strip() for _ in val.split(",")]
+                    )
+                elif key in (
+                    "filters.rejects",
+                    "filters.reject",
+                    "filters.ignore",
+                    "filters.ignores",
+                ):
                     config["filters.rejects"].extend(
-                        [_.strip() for _ in val.split(",")])
+                        [_.strip() for _ in val.split(",")]
+                    )
                 elif key == "sink.diff":
                     config[key] = val.strip()
                 else:
@@ -175,7 +185,7 @@ def run(arguments=sys.argv[1:], runningPath=".", logger=None):
 
     # If there is no arguments
     args = arguments
-    if not args or args[0] in ('-h', '--help'):
+    if not args or args[0] in ("-h", "--help"):
         if len(args) == 2:
             if args[1] == "diff":
                 print(diff.USAGE)
@@ -187,20 +197,23 @@ def run(arguments=sys.argv[1:], runningPath=".", logger=None):
         else:
             print(USAGE)
             return
-    elif args[0] == '--version':
+    elif args[0] == "--version":
         print(__version__)
         return
     elif args[0] in OPERATIONS.keys():
         engine = OPERATIONS[args[0]](logger, config)
         return engine.run(args[1:])
         # try:
-        #	return engine.run(args[1:])
+        # 	return engine.run(args[1:])
         # except Exception, e:
-        #	return logger.error(str(e))
+        # 	return logger.error(str(e))
     else:
         engine = OPERATIONS[""](logger, config)
         return engine.run(args)
         # try:
-        #	return engine.run(args)
+        # 	return engine.run(args)
         # except Exception, e:
-        #	return logger.error(str(e))
+        # 	return logger.error(str(e))
+
+
+# EOF

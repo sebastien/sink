@@ -1,3 +1,4 @@
-from .main import run()
-run()
+from .main import command
+
+command()
 # EOF
