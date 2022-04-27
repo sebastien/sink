@@ -1,9 +1,10 @@
-from enum import Enum
-from typing import Optional, Iterator, Iterable
+from typing import Optional, Iterator, Iterable, Any, cast
 from dataclasses import dataclass
 import os
 import stat
 import hashlib
+import json
+from .utils import asJSON
 
 
 # --
@@ -43,6 +44,11 @@ class NodeMeta:
     ctime: float
     mtime: float
 
+    @staticmethod
+    def FromDict(data: dict[str, Any]) -> "NodeMeta":
+        assert isinstance(data, dict), f"Expected dict, got: {data}"
+        return NodeMeta(**data)
+
 
 @dataclass
 class Node:
@@ -50,6 +56,20 @@ class Node:
     type: int
     meta: Optional[NodeMeta] = None
     sig: Optional[str] = None
+
+    @staticmethod
+    def FromDict(data: dict[str, Any]) -> "Node":
+        assert isinstance(data, dict), f"Expected dict, got: {data}"
+        return Node(
+            path=data["path"],
+            type=data.get("type", NodeType.NULL),
+            meta=NodeMeta.FromDict(cast(dict, data.get("meta")))
+            if "meta" in data
+            else None,
+            sig=data.get(
+                "sibl",
+            ),
+        )
 
 
 class Operations:
@@ -118,10 +138,20 @@ class FileSystem:
 
 
 class Snapshot:
+    @staticmethod
+    def Load(path: str) -> "Snapshot":
+        with open(path, "rt") as f:
+            return Snapshot(Node.FromDict(_) for _ in json.load(f).values())
+
     def __init__(self, nodes: Optional[Iterable[Node]] = None):
         self.nodes: dict[str, Node] = {}
         if nodes:
             self.extend(nodes)
+
+    def save(self, path: str):
+        with open(path, "wt") as f:
+            asJSON(self.nodes, f)
+        return self
 
     def extend(self, nodes: Iterable[Node]):
         for node in nodes:

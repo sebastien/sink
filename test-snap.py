@@ -1,5 +1,5 @@
-from sink2.snap import snapshot
-from sink2.utils import json
+from sink2.snap import Snapshot, snapshot
 
 
-print(json(snapshot(".").nodes))
+a = snapshot(".").save("a.json")
+b = Snapshot.Load("a.json")

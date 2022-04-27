@@ -10,7 +10,7 @@ class EnhancedJSONEncoder(JSONEncoder):
         return super().default(o)
 
 
-def json(value: Any, stream: Optional[TextIO] = None) -> Optional[str]:
+def asJSON(value: Any, stream: Optional[TextIO] = None) -> Optional[str]:
     if stream:
         dump(value, stream, cls=EnhancedJSONEncoder)
         return None
