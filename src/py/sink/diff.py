@@ -121,7 +121,7 @@ class NodeState:
     ):
         """Creates a file system node with the given location. The location
         is relative to the state root. The usesSignature parameter allows to
-        specify wether the node should use a signature or not. Large file nodes may take
+        specify whether the node should use a signature or not. Large file nodes may take
         too long to compute their signature, in which case this attributes
         comes in handy.
 
@@ -212,11 +212,6 @@ class NodeState:
     def hasChildren(self):
         """Tells if this node has any children."""
         return 0
-
-    @property
-    def children(self):
-        """Returns the children of this node."""
-        return ()
 
     def doOnParents(self, function):
         """Apply this function on this node parent, on the parent parent...
@@ -436,10 +431,6 @@ class DirectoryNodeState(NodeState):
     def hasChildren(self):
         return len(self._children)
 
-    @property
-    def children(self):
-        return self._children
-
     def _belongsToState(self, state):
         """Sets the given state as this node state. This invalidates makes the
         node uncached."""
@@ -632,6 +623,7 @@ class FileNodeState(NodeState):
 # ------------------------------------------------------------------------------
 
 
+# NOTE: This is an interesting piece of code that is actually
 def guessNodeStateAncestors(node, nodes):
     """Returns an order list of (percentage, nodes) indicating the
     probability for each node to be an ancestor of the current node.
@@ -687,7 +679,7 @@ def guessNodeStateAncestors(node, nodes):
         if node.getAttribute("Permissions") == node.getAttribute("Permissions"):
             node_rate += 0.03
         result.append((node_rate, node))
-    result.sort(lambda x, y: cmp(x[0], y[0]))
+    result.sort(key=lambda _: _[0])
     return result
 
 
@@ -882,12 +874,16 @@ class State:
 
 # ------------------------------------------------------------------------------
 #
-#  Change track
+#  Change tracking
 #
 # ------------------------------------------------------------------------------
 
 
-def sets(firstSet, secondSet, objectAccessor=lambda x: x):
+def diffStates(
+    firstSet: dict[str, NodeState],
+    secondSet: dict[str, NodeState],
+    accessor=lambda _: _,
+):
     """
     Returns elements that are unique to first and second set, then elements
     that are common to both.
@@ -898,26 +894,26 @@ def sets(firstSet, secondSet, objectAccessor=lambda x: x):
             - elements only in second set
             - elements common to both sets
 
-    The objectAccessor operation is used on each object of the set to access
+    The accessor operation is used on each object of the set to access
     the element that will be used as a comparison basis. By default, it is the
     element itself."""
 
     # We precompute the maps
-    set_first_acc = [objectAccessor(_) for _ in firstSet]
-    set_second_acc = [objectAccessor(_) for _ in secondSet]
+    set_first_acc = [accessor(_) for _ in firstSet]
+    set_second_acc = [accessor(_) for _ in secondSet]
 
     # Declare the filtering predicates
     # First set elements not in second set
     def first_only(x):
-        return objectAccessor(x) not in set_second_acc
+        return accessor(x) not in set_second_acc
 
     # Second set elements not in first set
     def second_only(x):
-        return objectAccessor(x) not in set_first_acc
+        return accessor(x) not in set_first_acc
 
     # First sets elements in second set == second set elts in first set
     def common(x):
-        return objectAccessor(x) in set_second_acc
+        return accessor(x) in set_second_acc
 
     # Compute the result
     return (
@@ -1036,13 +1032,24 @@ class Tracker:
 
         changes = Change(newState, previousState)
 
+        for key, value in newState.nodesByLocation().items():
+            print(f"A {key}")
+        for key, value in previousState.nodesByLocation().items():
+            print(f"B {key}")
+
         # We look for new nodes, nodes that are only in the previous location,
         # and nodes that are still there
-        new_locations, prev_locations, same_locations = sets(
+        new_locations, prev_locations, same_locations = diffStates(
             newState.nodesByLocation().items(),
             previousState.nodesByLocation().items(),
             lambda x: x[0],
         )
+        for loc, _ in new_locations:
+            print("+", loc, _.getAbsoluteLocation())
+        for _ in prev_locations:
+            print("-", loc, _.getAbsoluteLocation())
+        for _ in same_locations:
+            print("~", loc, _.getAbsoluteLocation())
 
         # TODO: This should be improved with copied and moved files, but this
         # would require a GUI
