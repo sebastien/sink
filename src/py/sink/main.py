@@ -17,13 +17,9 @@ from os.path import basename, dirname
 
 # We try to import the sink module. If we have trouble, we simply insert the
 # path into the Python path
-try:
-    from sink import diff, snap
-except:
-    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-    from sink import diff, snap
+from . import diff, snap, backup
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 # ------------------------------------------------------------------------------
 #
@@ -120,6 +116,7 @@ OPERATIONS = {
     "--snap": snap.Engine,
     "diff": diff.Engine,
     "snap": snap.Engine,
+    "backup": backup.Engine,
     "": diff.Engine,
 }
 

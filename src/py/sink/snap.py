@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# Encoding: iso-8859-1
 # -----------------------------------------------------------------------------
 # Project           :   Sink
 # -----------------------------------------------------------------------------
@@ -7,13 +6,13 @@
 # License           :   BSD License (revised)
 # -----------------------------------------------------------------------------
 # Creation date     :   2009-09-29
-# Last mod.         :   2012-02-22
+# Last mod.         :   2022-04-27
 # -----------------------------------------------------------------------------
 
 import os
 import sys
 import json
-from sink import diff
+from . import diff
 
 # ------------------------------------------------------------------------------
 #
@@ -64,6 +63,7 @@ class Engine:
 
     def setup(self, config):
         """Sets up the engine using the given configuration object."""
+        pass
 
     def run(self, arguments):
         """Runs the command using the given list of arguments (a list of
@@ -84,17 +84,17 @@ class Engine:
         # Ensures that the directory exists
         if os.path.isdir(root_path):
             # We take a state snapshot of the given directory
-            root_state = diff.State(
-                root_path, accepts=accepts, rejects=rejects)
+            root_state = diff.State(root_path, accepts=accepts, rejects=rejects)
             root_state.populate(lambda x: True)
             json.dump(root_state.exportToDict(), sys.stdout)
         else:
-            with open(root_path, 'r') as f:
+            with open(root_path, "r") as f:
                 d = json.loads(f.read())
             print(diff.State.FromDict(d))
         return 0
 
     def usage(self):
         return USAGE
+
 
 # EOF

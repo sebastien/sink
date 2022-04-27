@@ -16,6 +16,7 @@
 # -----------------------------------------------------------------------------
 
 import os
+import sys
 import hashlib
 import stat
 import time
@@ -23,7 +24,8 @@ import fnmatch
 import getopt
 import json
 import re
-from typing import Iterable, NamedTuple, Optional
+from typing import Iterable, NamedTuple, Optional, Any
+from enum import Enum
 from pathlib import Path
 
 # Error messages
@@ -43,6 +45,16 @@ class InteractiveDiff(NamedTuple):
 
     row: int
     sources: list[int]
+
+
+class NodeType(Enum):
+    """Defines the type of nodes that are store."""
+
+    FILE = 1
+    DIR = 2
+    LINK = 3
+    # Special is anything but the rest
+    SPECIAL = 10
 
 
 def is_dir(path, resolveLink=True):
@@ -97,12 +109,12 @@ class NodeState:
     def FromDict(state, data):
         assert state
         location = data["attributes"].get("location")
-        if data["type"] == FileNodeState.__name__:
+        if data["class"] == FileNodeState.__name__:
             return FileNodeState(state, location, data=data)
-        elif data["type"] == DirectoryNodeState.__name__:
+        elif data["class"] == DirectoryNodeState.__name__:
             return DirectoryNodeState(state, location, data=data)
         else:
-            assert None, "Unsupported type: %s" % (data["type"])
+            assert None, "Unsupported class: %s" % (data["class"])
 
     def __init__(
         self, state, location, usesSignature=True, accepts=(), rejects=(), data=None
@@ -117,17 +129,20 @@ class NodeState:
         attributes attributes from the local filesystem, but this implies that the
         nodes exists on the file system. Otherwise the `_attributes' and `_contentSignature'
         attributes can be set by hand."""
-        self._uid = "N%s" % (NodeState.COUNTER)
-        self._parent = None
+        # TODO: We should be keeping the error state
+        self._uid = f"N{NodeState.COUNTER}"
+        self._type: Optional[NodeType] = None
+        self._parent: Optional[NodeState] = None
         self._state = None
-        self._cached = False
+        self._cached: bool = False
         self._accepts = accepts
         self._rejects = rejects or GITIGNORE
-        self._attributes = {}
-        self._tags = {}
+        self._attributes: dict[str, Any] = {}
+        self._tags: dict[str, str] = {}
         self._contentSignature = None
         self._attributesSignature = None
         self._usesSignature = usesSignature
+        # TODO:
         self._belongsToState(state)
         NodeState.COUNTER += 1
         if data:
@@ -140,7 +155,7 @@ class NodeState:
     def exportToDict(self):
         result = {
             "parent": self._parent and self._parent.location(),
-            "type": self.__class__.__name__,
+            "class": self.__class__.__name__,
             "uid": self._uid,
             "accepts": self._accepts,
             "rejects": self._rejects,
@@ -158,16 +173,47 @@ class NodeState:
         self._tags = data["tags"]
         self._contentSignature = data["contentSignature"]
         self._attributesSignature = data["attributesSignature"]
+        _type = data.get("type")
+        self._type = next((_ for _ in NodeType if _.value == _type), None)
         return self
 
+    @property
+    def type(self) -> NodeType:
+        if self._type is None:
+            s = os.stat(self.getAbsoluteLocation()).st_mode
+            if stat.S_ISDIR(s):
+                self._type = NodeType.DIR
+            elif stat.S_ISREG(s):
+                self._type = NodeType.FILE
+            elif stat.S_ISLNK(s):
+                self._type = NodeType.LINK
+            else:
+                self._type = NodeType.SPECIAL
+        return self._type
+
+    @property
+    def isFile(self):
+        return self._type == NodeType.FILE
+
+    @property
+    def isSpecial(self):
+        return self._type == NodeType.SPECIAL
+
+    @property
+    def isLink(self):
+        return self._type == NodeType.LINK
+
+    @property
     def isDirectory(self):
-        """Tells wether the node is a directory or not."""
+        """Tells whether the node is a directory or not."""
         return False
 
+    @property
     def hasChildren(self):
         """Tells if this node has any children."""
         return 0
 
+    @property
     def children(self):
         """Returns the children of this node."""
         return ()
@@ -381,13 +427,16 @@ class DirectoryNodeState(NodeState):
             self._children.append(NodeState.FromDict(self._state, child))
         return self
 
+    @property
     def isDirectory(self):
         """Returns True."""
         return True
 
+    @property
     def hasChildren(self):
         return len(self._children)
 
+    @property
     def children(self):
         return self._children
 
@@ -473,7 +522,7 @@ class DirectoryNodeState(NodeState):
     def iterateDescendants(self):
         for child in self._children:
             yield child
-            if child.hasChildren():
+            if child.hasChildren:
                 for descendant in child.iterateDescendants():
                     yield descendant
 
@@ -484,7 +533,7 @@ class DirectoryNodeState(NodeState):
                 function(child, context)
             else:
                 function(child)
-            if child.hasChildren():
+            if child.hasChildren:
                 child.walkChildren(function, context)
 
     def getChildren(self, types=None):
@@ -553,13 +602,18 @@ class FileNodeState(NodeState):
 
     def getData(self):
         """Returns the data contained in this file as a string."""
-        fd = None
-        try:
-            with open(self.getAbsoluteLocation(), "rb") as f:
-                return f.read()
-        except IOError:
-            data = b""
-        return data
+        if not self.isFile:
+            return b""
+        else:
+            path: str = self.getAbsoluteLocation()
+            try:
+                with open(path, "rb") as f:
+                    return f.read()
+            except IOError as e:
+                sys.stderr.write("[!] ERR {path}: {e}\n")
+                # TODO: We should be logging that error
+                data = b""
+            return data
 
     def _updateSignature(self):
         """A file signature is the signature of its content."""
@@ -1357,21 +1411,21 @@ class Engine:
             for node in added:
                 if not show.get(ADDED):
                     break
-                if node.isDirectory():
+                if node.isDirectory:
                     continue
                 all_locations_keys[node.location()] = True
                 locations[node.location()] = ADDED
             for node in removed:
                 if not show.get(REMOVED):
                     break
-                if node.isDirectory():
+                if node.isDirectory:
                     continue
                 all_locations_keys[node.location()] = True
                 locations[node.location()] = REMOVED
             for node in changed:
                 if not show.get(NEWER) or not show.get(OLDER):
                     break
-                if node.isDirectory():
+                if node.isDirectory:
                     continue
                 all_locations_keys[node.location()] = True
                 old_node = change.previousState.nodeWithLocation(node.location())
@@ -1389,7 +1443,7 @@ class Engine:
             for node in unchanged:
                 if not show.get(SAME):
                     break
-                if node.isDirectory():
+                if node.isDirectory:
                     continue
                 all_locations_keys[node.location()] = True
                 locations[node.location()] = SAME
