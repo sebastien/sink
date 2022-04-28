@@ -13,50 +13,57 @@ class FileSystem:
     def walk(
         cls,
         path: str,
-        followLinks=False,
+        accepts: Optional[list[str]] = None,
+        rejects: Optional[list[str]] = None,
+    ) -> Iterator[str]:
+        """Does a breadth-first walk of the filesystem, yielding non-directory
+        paths that match the `accepts` and `rejects` filters."""
+        queue: list[str] = [path]
+        # NOTE: This is no
+        while queue:
+            base_path = queue.pop()
+            for rel_path in os.listdir(base_path):
+                if matches(rel_path, accepts, rejects):
+                    abs_path = f"{base_path}/{rel_path}"
+                    if os.path.isdir(abs_path):
+                        queue.append(abs_path)
+                    else:
+                        # TODO: Should we follow symlinks?
+                        yield abs_path
+
+    @classmethod
+    def nodes(
+        cls,
+        path: str,
         accepts: Optional[list[str]] = None,
         rejects: Optional[list[str]] = None,
     ) -> Iterator[Node]:
         """Walks the given path and produces nodes augmented with metadata"""
-        abs_path = os.path.abspath(path)
-        offset = len(abs_path) + 1
-        ignored: dict[str, bool] = {}
-        print("IGNORED", ignored)
-        for dirpath, dirnames, filenames in os.walk(abs_path, followlinks=followLinks):
-            is_ignored = dirpath in ignored
-            if is_ignored:
-                for _ in dirnames:
-                    if not matches(_, accepts, rejects):
-                        ignored[f"{dirpath}/{_}"] = True
+        offset = len(path) + 1
+        for path in cls.walk(path, accepts, rejects):
+            if os.path.exists(path):
+                meta = cls.meta(path)
+                node_type = (
+                    NodeType.FILE
+                    if stat.S_ISREG(meta.mode)
+                    else NodeType.DIRECTORY
+                    if stat.S_ISREG(meta.mode)
+                    else NodeType.LINK
+                    if stat.S_ISLNK(meta.mode)
+                    else NodeType.SPECIAL
+                )
+                yield Node(
+                    path[offset:],
+                    node_type,
+                    meta,
+                    cls.signature(path) if node_type == NodeType.FILE else None,
+                )
             else:
-                for _ in filenames:
-                    path = f"{dirpath}/{_}"
-                    print("XXX ", path, (accepts, rejects))
-                    if not matches(path, accepts, rejects):
-                        continue
-                    if os.path.exists(path):
-                        meta = cls.meta(path)
-                        node_type = (
-                            NodeType.FILE
-                            if stat.S_ISREG(meta.mode)
-                            else NodeType.DIRECTORY
-                            if stat.S_ISREG(meta.mode)
-                            else NodeType.LINK
-                            if stat.S_ISLNK(meta.mode)
-                            else NodeType.SPECIAL
-                        )
-                        yield Node(
-                            path[offset:],
-                            node_type,
-                            meta,
-                            cls.signature(path) if node_type == NodeType.FILE else None,
-                        )
-                    else:
-                        yield Node(path, NodeType.NULL, None, None)
+                yield Node(path, NodeType.NULL, None, None)
 
     @classmethod
     def meta(cls, path: str) -> NodeMeta:
-        """Returns the meta"""
+        """Returns the meta information"""
         r = os.stat(path)
         return NodeMeta(
             mode=r.st_mode,
@@ -79,7 +86,9 @@ class FileSystem:
 def snapshot(
     path: str, accepts: Optional[list[str]] = None, rejects: Optional[list[str]] = None
 ) -> Snapshot:
-    return Snapshot(FileSystem.walk(path, accepts, rejects))
+    """Creates a snapshot for the given `path`, given the `accepts` and `rejects`
+    filters."""
+    return Snapshot(FileSystem.nodes(path, accepts, rejects))
 
 
 # EOF
