@@ -1,12 +1,14 @@
 from .model import Node, Snapshot, Optional
-from dataclasses import dataclass, field
-
-# @dataclass
-# class NodeDiff:
-#     path:str
+from enum import Enum
 
 
-class Status:
+# --
+# ## Directory diffing command
+
+
+class Status(Enum):
+    """Defines the status of an entr"""
+
     ADDED = "[+]"
     REMOVED = "[-]"
     NEWER = "[>]"
@@ -73,3 +75,6 @@ def diff(*snapshots: Snapshot) -> dict[str, list[Optional[Node]]]:
                 states[node.path] = [None] * n
             states[node.path][i] = node
     return {path: status(*sources) for path, sources in states.items()}
+
+
+# EOF
