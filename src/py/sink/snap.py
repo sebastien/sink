@@ -35,6 +35,7 @@ class FileSystem:
     def nodes(
         cls,
         path: str,
+        *,
         accepts: Optional[list[str]] = None,
         rejects: Optional[list[str]] = None,
     ) -> Iterator[Node]:
@@ -84,11 +85,14 @@ class FileSystem:
 
 
 def snapshot(
-    path: str, accepts: Optional[list[str]] = None, rejects: Optional[list[str]] = None
+    path: str,
+    *,
+    accepts: Optional[list[str]] = None,
+    rejects: Optional[list[str]] = None,
 ) -> Snapshot:
     """Creates a snapshot for the given `path`, given the `accepts` and `rejects`
     filters."""
-    return Snapshot(FileSystem.nodes(path, accepts, rejects))
+    return Snapshot(FileSystem.nodes(path, accepts=accepts, rejects=rejects))
 
 
 # EOF

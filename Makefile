@@ -1,19 +1,36 @@
-PY_MODULE=sink2
-SOURCES_PY=$(filter src/py/sink2/%,$(wildcard src/py/*.py src/py/*/*.py src/py/*/*/*.py src/py/*/*/*/*.py))
+PROJECT:=$(notdir $(abspath .))
+SOURCES_BIN:=$(wildcard bin/*)
+PYTHON_MODULES=$(patsubst src/py/%,%,$(wildcard src/py/*))
+SOURCES_PY:=$(wildcard src/py/*.py src/py/*/*.py src/py/*/*/*.py src/py/*/*/*/*.py)
 
 PATH_LOCAL_PY=$(firstword $(shell python -c "import sys,pathlib;sys.stdout.write(' '.join([_ for _ in sys.path if _.startswith(str(pathlib.Path.home()))] ))"))
 PATH_LOCAL_BIN=~/.local/bin
 
 try-install:
-	ln -sfr bin/nota $(PATH_LOCAL_BIN)/nota
-	if [ -s "$(PATH_LOCAL_PY)" ]; then ln -sfr src/py/nota "$(PATH_LOCAL_PY)"/nota; fi
+	@for file in $(SOURCES_BIN); do
+		ln -sfr $$file $(PATH_LOCAL_BIN)/$$(basename $$file)
+	done
+	if [ -s "$(PATH_LOCAL_PY)" ]; then
+		for module in $(PYTHON_MODULES); do
+			ln -sfr src/py/$$module "$(PATH_LOCAL_PY)"/$$module
+		done
+	fi
+
 
 try-uninstall:
-	unlink $(PATH_LOCAL_BIN)/nota; true
-	if [ -s "$(PATH_LOCAL_PY)" ]; then unlink src/py/nota "$(PATH_LOCAL_PY)"/nota; true; fi
+	@for file in $(SOURCES_BIN); do
+		unlink $(PATH_LOCAL_BIN)/$$(basename $$file)
+	done
+	if [ -s "$(PATH_LOCAL_PY)" ]; then
+		for module in $(PYTHON_MODULES); do
+			unlink "$(PATH_LOCAL_PY)"/$$module
+		done
+	fi
 
 print-%:
 	@echo "$*="
 	@for FILE in $($*); do echo $$FILE; done
+
+.ONESHELL:
 
 # EOF

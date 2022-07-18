@@ -1,9 +1,10 @@
-from typing import Callable, Optional, NamedTuple
+from typing import Callable, Optional, NamedTuple, Generic, TypeVar
 from contextlib import contextmanager
 import argparse
 import re
 import sys
 
+T = TypeVar("T")
 # --
 # # CLI EDSL
 #
@@ -151,6 +152,17 @@ def command(
     return wrapper
 
 
+class CLI(Generic[T]):
+    def __init__(self, context: T):
+        self.context: T = context
+
+    def out(self, text: str):
+        sys.stdout.write(text)
+
+
+# --
+# This is the entry point to process the command line function registered
+# in the `COMMANDS` mapping.
 def run(
     args: list[str] = sys.argv[1:], name=None, description=None, context=None
 ) -> int:
@@ -185,11 +197,20 @@ def run(
     if rest:
         raise ValueError("Cannot parse the command", parsed, rest)
     # Or we've parsed something and we have the matching subcommand
-    elif parsed and parsed.subcommand:
-        fun, fun_doc, fun_args, options, aliases = COMMANDS[parsed.subcommand]
+    elif parsed and (cmd_name := parsed.subcommand):
+        fun, _, cmd_args, options, _ = COMMANDS[cmd_name]
         # FIXME: The conversation to lower here is likely to break at some point
         # TODO: Should pass parsed there
-        result = fun(context, *(getattr(parsed, k.lower()) for k in fun_args))
+        fun_kwargs = {k.lower(): getattr(parsed, k.lower()) for k in cmd_args}
+        try:
+            result = fun(CLI(context), **fun_kwargs)
+        except TypeError as e:
+            sys.stderr.write(
+                f"CLI arguments mismatch:\n"
+                f" - command-line options are: {', '.join(f'#{i}={_}' for i,_ in enumerate(cmd_args))}\n"
+                f" - argument values are: {fun_kwargs}\n"
+            )
+            raise e
         return result
     else:
         # FIXME: Not sure what is going in there

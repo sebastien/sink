@@ -42,6 +42,8 @@ class NodeMeta:
 
 @dataclass
 class Node:
+    """Represents the snapshot of a node in a given tree."""
+
     path: str
     type: int
     meta: Optional[NodeMeta] = None
@@ -67,6 +69,8 @@ class Node:
 
 
 class Snapshot:
+    """Represents a collection of node states."""
+
     def __init__(self, nodes: Optional[Iterable[Node]] = None):
         self.nodes: dict[str, Node] = {}
         if nodes:
@@ -84,6 +88,8 @@ class Snapshot:
 
 
 class NodePredicates:
+    """Convenience functions to compare nodes"""
+
     @classmethod
     def IsSame(cls, a: Node, b: Node) -> bool:
         return a.sig == b.sig and a.meta == b.meta
