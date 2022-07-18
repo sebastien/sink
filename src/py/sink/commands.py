@@ -2,7 +2,7 @@ from .cli import command, write, run, CLI
 from .utils import gitignored, difftool
 from .snap import snapshot
 from .diff import diff as _diff
-from .model import Snapshot
+from .model import Snapshot, Status
 from typing import Optional, NamedTuple
 from pathlib import Path
 
@@ -148,11 +148,21 @@ def diff(
     def has_row(i: int) -> bool:
         return not diff_ranges.rows or i in diff_ranges.rows
 
+    def has_changes(status: list[Status]) -> bool:
+        for _ in status:
+            if _ not in (Status.ORIGIN, Status.SAME):
+                return True
+        return False
+
     # --
     # List formatting
-    for i, p_nodes in enumerate(compared.items()):
-        p, nodes = p_nodes
-        if not diff_ranges.rows or i in diff_ranges.rows:
+    edit_rounds: int = 0
+    i: int = 0
+    for p, nodes in compared.items():
+        if not has_changes(nodes):
+            continue
+        i += 1
+        if not diff_ranges.rows or (i - 1) in diff_ranges.rows:
             print(
                 f"{i:3d}",
                 p.ljust(node_path_length),
@@ -166,7 +176,21 @@ def diff(
                     for j, _ in enumerate(nodes)
                     if j == 0 or has_source(j)
                 ]
+                if edit_rounds > 0:
+                    if (
+                        # FIXME: Better prompt formatting
+                        answer := (
+                            cli.ask("- ↳ [E]dit ┄ [s]kip ┄ [q]uit → ").strip().lower()
+                        )
+                        or " "
+                    ) == "q":
+                        break
+                    elif answer[0] == "s":
+                        continue
+                    else:
+                        pass
                 difftool(*paths)
+                edit_rounds += 1
 
 
 # EOF

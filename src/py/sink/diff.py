@@ -1,22 +1,9 @@
-from .model import Node, Snapshot, Optional
+from .model import Node, Snapshot, Optional, Status
 from enum import Enum
 
 
 # --
 # ## Directory diffing command
-
-
-class Status(Enum):
-    """Defines the status of an entr"""
-
-    ADDED = "[+]"
-    REMOVED = " - "
-    NEWER = " > "
-    OLDER = " < "
-    SAME = " = "
-    CHANGED = " ~ "
-    ABSENT = "-!-"
-    ORIGIN = " . "
 
 
 def compareNodes(a: Optional[Node], b: Optional[Node]) -> int:
@@ -46,17 +33,18 @@ def status(origin: Optional[Node], *others: Optional[Node]) -> list[Status]:
         elif not other:
             res.append(Status.REMOVED)
             removed_count += 1
-        elif other.isNewer(origin):
-            res.append(Status.NEWER)
-            changed_count += 1
-            newer_count += 1
-        elif other.isOlder(origin):
-            res.append(Status.OLDER)
-            older_count += 1
-            changed_count += 1
         elif other.hasChanged(origin):
-            res.append(Status.CHANGED)
-            changed_count += 1
+            if other.isNewer(origin):
+                res.append(Status.NEWER)
+                changed_count += 1
+                newer_count += 1
+            elif other.isOlder(origin):
+                res.append(Status.OLDER)
+                older_count += 1
+                changed_count += 1
+            else:
+                res.append(Status.CHANGED)
+                changed_count += 1
         else:
             res.append(Status.SAME)
     # We compare the origin with the rest
@@ -78,6 +66,7 @@ def status(origin: Optional[Node], *others: Optional[Node]) -> list[Status]:
     return res
 
 
+# TODO: Should do sha vs time
 def diff(*snapshots: Snapshot) -> dict[str, list[Status]]:
     """Compares the list of snapshots, returning a list of status per snapshot"""
     states: dict[str, list[Optional[Node]]] = {}

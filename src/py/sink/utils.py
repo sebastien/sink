@@ -63,7 +63,7 @@ def gitignored(path: Optional[Path] = None) -> list[str]:
     return res
 
 
-def difftool(origin: Path, *other: list[Path]):
+def difftool(origin: Path, *other: Path):
     # NOTE: We assume 2 way diff for now
     tool: str = (
         os.getenv("SINK_DIFF") or os.getenv("DIFFTOOL") or os.getenv("EDITOR") or "diff"

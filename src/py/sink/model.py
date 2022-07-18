@@ -1,11 +1,25 @@
 from typing import Optional, Iterable, Iterator
 from dataclasses import dataclass
-
+from enum import Enum
 
 # --
 # This is a re-implementation of Sink (V1) backend, with a few different
 # takes. First is to use type annotation as much as possible, second is
 # to use
+
+
+class Status(Enum):
+    """Defines the status of an entry"""
+
+    # TODO: Remove the spaces
+    ADDED = " + "
+    REMOVED = " - "
+    NEWER = " > "
+    OLDER = " < "
+    SAME = " = "
+    CHANGED = " ~ "
+    ABSENT = " ! "
+    ORIGIN = " . "
 
 
 class NodeDifference:

@@ -156,6 +156,9 @@ class CLI(Generic[T]):
     def __init__(self, context: T):
         self.context: T = context
 
+    def ask(self, prompt: str) -> str:
+        return input(prompt)
+
     def out(self, text: str):
         sys.stdout.write(text)
 
