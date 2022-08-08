@@ -141,8 +141,9 @@ def diff(
         )
     print(" " * node_path_length, " ".join(f" ⇣ " for _ in range(len(sources))))
 
-    # We defined convenience funcions
+    # We defined convenience functions
     def has_source(i: int) -> bool:
+        """Tells if the given number is in the given diff ranges"""
         return not diff_ranges.sources or i in diff_ranges.sources
 
     def has_row(i: int) -> bool:
@@ -157,40 +158,44 @@ def diff(
     # --
     # List formatting
     edit_rounds: int = 0
-    i: int = 0
-    for p, nodes in compared.items():
-        if not has_changes(nodes):
+    # We iterate on the nodes, skipping the ones that have no changes.
+    for i, p_nodes in enumerate(
+        (p, nodes) for p, nodes in compared.items() if has_changes(nodes)
+    ):
+        # We skip any row that is not in the -d sources, if provided.
+        if not has_row(i):
             continue
-        i += 1
-        if not diff_ranges.rows or (i - 1) in diff_ranges.rows:
-            print(
-                f"{i:3d}",
-                p.ljust(node_path_length),
-                " ".join(
-                    _.value if has_source(j) else "   " for j, _ in enumerate(nodes)
-                ),
-            )
-            if with_diff:
-                paths = [
-                    Path(sources[j]) / p
-                    for j, _ in enumerate(nodes)
-                    if j == 0 or has_source(j)
-                ]
-                if edit_rounds > 0:
-                    if (
-                        # FIXME: Better prompt formatting
-                        answer := (
-                            cli.ask("- ↳ [E]dit ┄ [s]kip ┄ [q]uit → ").strip().lower()
-                        )
-                        or " "
-                    ) == "q":
-                        break
-                    elif answer[0] == "s":
-                        continue
-                    else:
-                        pass
-                difftool(*paths)
-                edit_rounds += 1
+        # We print the row, filtering out the sources
+        p, nodes = p_nodes
+        print(
+            f"{i:3d}",
+            p.ljust(node_path_length),
+            " ".join(_.value if has_source(j) else "   " for j, _ in enumerate(nodes)),
+        )
+        # --
+        # We have the -d option, so we're going to interactively review
+        # the diffs.
+        if with_diff:
+            paths = [
+                Path(sources[j]) / p
+                for j, _ in enumerate(nodes)
+                if j == 0 or has_source(i)
+            ]
+            if edit_rounds > 0:
+                if (
+                    # FIXME: Better prompt formatting
+                    answer := (
+                        cli.ask("- ↳ [E]dit ┄ [s]kip ┄ [q]uit → ").strip().lower()
+                    )
+                    or " "
+                ) == "q":
+                    break
+                elif answer[0] == "s":
+                    continue
+                else:
+                    pass
+            difftool(*paths)
+            edit_rounds += 1
 
 
 # EOF

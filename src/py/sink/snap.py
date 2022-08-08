@@ -4,6 +4,7 @@ import stat
 import hashlib
 from .model import Node, NodeType, NodeMeta, Snapshot, Optional
 from .utils import matches
+from .logging import metric
 
 
 class FileSystem:
@@ -15,16 +16,19 @@ class FileSystem:
         path: str,
         accepts: Optional[list[str]] = None,
         rejects: Optional[list[str]] = None,
+        followLinks: bool = False,
     ) -> Iterator[str]:
         """Does a breadth-first walk of the filesystem, yielding non-directory
         paths that match the `accepts` and `rejects` filters."""
         queue: list[str] = [path]
-        # NOTE: This is no
         while queue:
             base_path = queue.pop()
+            # TODO: It may be better to use os.walk there...
             for rel_path in os.listdir(base_path):
                 if matches(rel_path, accepts, rejects):
                     abs_path = f"{base_path}/{rel_path}"
+                    if not followLinks and os.path.islink(abs_path):
+                        continue
                     if os.path.isdir(abs_path):
                         queue.append(abs_path)
                     else:
@@ -41,7 +45,8 @@ class FileSystem:
     ) -> Iterator[Node]:
         """Walks the given path and produces nodes augmented with metadata"""
         offset = len(path) + 1
-        for path in cls.walk(path, accepts, rejects):
+        snap_paths = metric("snap.paths")
+        for path in cls.walk(path, accepts, rejects, followLinks=False):
             if os.path.exists(path):
                 meta = cls.meta(path)
                 node_type = (
@@ -53,6 +58,7 @@ class FileSystem:
                     if stat.S_ISLNK(meta.mode)
                     else NodeType.SPECIAL
                 )
+                snap_paths.inc()
                 yield Node(
                     path[offset:],
                     node_type,

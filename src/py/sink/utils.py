@@ -65,12 +65,11 @@ def gitignored(path: Optional[Path] = None) -> list[str]:
 
 def difftool(origin: Path, *other: Path):
     # NOTE: We assume 2 way diff for now
-    tool: str = (
-        os.getenv("SINK_DIFF") or os.getenv("DIFFTOOL") or os.getenv("EDITOR") or "diff"
-    )
+    tool: str = os.getenv("SINK_DIFF") or os.getenv("DIFFTOOL") or "diff -u"
     prefix = [_ for _ in (_.strip() for _ in tool.split()) if _]
     for _ in other:
-        subprocess.run(prefix + [origin, _])
+        cmd: list[str] = prefix + [origin, _]
+        res = subprocess.run(cmd, capture_output=False)
 
 
 # EOF
