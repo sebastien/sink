@@ -76,7 +76,8 @@ def diff(*snapshots: Snapshot) -> dict[str, list[Status]]:
             if node.path not in states:
                 states[node.path] = [None] * n
             states[node.path][i] = node
-    return {path: status(*sources) for path, sources in states.items()}
+    # FIXME: The sort here may be an issue performance-wise
+    return {path: status(*sources) for path, sources in sorted(states.items())}
 
 
 # EOF
