@@ -1,7 +1,7 @@
 import os
 import hashlib
 from pathlib import Path
-from typing import Optional, Iterable, NamedTuple, TextIO, Dict, Set, Union
+from typing import Optional, Iterable, NamedTuple, TextIO, Set, Union
 
 # --
 # # Snap
@@ -10,21 +10,20 @@ from typing import Optional, Iterable, NamedTuple, TextIO, Dict, Set, Union
 # the result later one. It is a simplified reimplementation of the key functionality
 # provided in [Sink](https://github.com/sebastien/sink).
 
-Stat = NamedTuple(
-    "Stat",
-    [
-        ("mode", int),
-        ("uid", int),
-        ("gid", int),
-        ("size", int),
-        ("ctime", float),
-        ("mtime", float),
-    ],
-)
 
-PathElement = NamedTuple(
-    "PathElement", [("path", str), ("meta", Optional[Stat]), ("sig", Optional[str])]
-)
+class Stat(NamedTuple):
+    mode: int
+    uid: int
+    gid: int
+    size: int
+    ctime: float
+    mtime: float
+
+
+class PathElement(NamedTuple):
+    path: str
+    meta: Optional[Stat] = None
+    sig: Optional[Stat] = None
 
 
 def file_meta(path: str) -> Stat:
@@ -58,7 +57,7 @@ def walk(path: str) -> Iterable[PathElement]:
                 yield PathElement(path, None, None)
 
 
-def index(elements: Iterable[PathElement]) -> Dict[str, PathElement]:
+def index(elements: Iterable[PathElement]) -> dict[str, PathElement]:
     return dict((_.path, _) for _ in elements)
 
 
@@ -98,7 +97,6 @@ def parse(line: str) -> PathElement:
     if len(fields) != 3:
         return None
     else:
-        path, meta, sig
         return PathElement(
             path,
             Stat(*((int if i < 4 else float)(_) for i, _ in enumerate(meta.split(","))))
@@ -113,14 +111,14 @@ def fmt(element: PathElement) -> str:
     return f"{path}\t{','.join(str(_) for _ in meta) if meta else ''}\t{sig if sig else ''}"
 
 
-def paths(indexes: Iterable[Dict[str, PathElement]]) -> Set[str]:
+def paths(indexes: Iterable[dict[str, PathElement]]) -> Set[str]:
     res = set()
     for _ in indexes:
         res = res.union(k for k in _)
     return res
 
 
-def compare(paths: Iterable[str]) -> Iterable[Tuple[str, List[str]]]:
+def compare(paths: Iterable[str]) -> Iterable[tuple[str, list[str]]]:
     sources = [index(read(_)) for _ in paths]
     all_paths = paths(sources)
     for p in all_paths:
@@ -149,5 +147,9 @@ def compare(paths: Iterable[str]) -> Iterable[Tuple[str, List[str]]]:
 # for path, entries in compare(SOURCES):
 #     print(f"{SEP.join(entries)}{SEP}{path}")
 
+import sys, json
 
+for element in walk(sys.argv[1]):
+    json.dump(element, sys.stdout)
+    sys.stdout.write("\n")
 # EOF
