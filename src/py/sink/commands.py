@@ -103,7 +103,7 @@ def snap(
 ):
     """Takes a snapshot of the given file location."""
 
-    f = filters(
+    active_filters = filters(
         rejects=ignores,
         accepts=accepts,
         keeps=keeps,
@@ -114,8 +114,9 @@ def snap(
     )
     s = snapshot(
         path,
-        accepts=f.accepts,
-        rejects=f.rejects,
+        accepts=active_filters.accepts,
+        rejects=active_filters.rejects,
+        keeps=active_filters.keeps,
     )
     with write(output) as f:
         for path in s.nodes:
@@ -227,7 +228,8 @@ def diff(
         cli.out(
             " ".join((" " * (node_path_length), " ┆ " * i, f"[{SOURCES[i]}] ← {p}"))
         )
-    print(" " * node_path_length, " ".join(f" ⇣ " for _ in range(len(sources))))
+    # TODO: Restore that
+    # cli.out(" " * node_path_length, " ".join(f" ⇣ " for _ in range(len(sources))))
 
     # We defined convenience functions
     def has_source(i: int) -> bool:

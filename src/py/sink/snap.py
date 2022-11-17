@@ -30,12 +30,25 @@ class FileSystem:
             for rel_path in os.listdir(base_path):
                 if matches(rel_path, accepts=accepts, rejects=rejects, keeps=keeps):
                     abs_path = f"{base_path}/{rel_path}"
-                    if not followLinks and os.path.islink(abs_path):
-                        continue
-                    if os.path.isdir(abs_path):
-                        queue.append(abs_path)
+                    is_link = (
+                        0  # This is not a link
+                        if not os.path.islink(abs_path)
+                        else 2  # This is a link to a directory
+                        if os.path.isdir(os.readlink(abs_path))
+                        else 1  # This is a link to not a directory
+                    )
+                    is_dir = (
+                        True
+                        if is_link == 2
+                        else False
+                        if is_link
+                        else os.path.isdir(abs_path)
+                    )
+                    if is_dir:
+                        if not is_link or followLinks:
+                            queue.append(abs_path)
                     else:
-                        # TODO: Should we follow symlinks?
+                        # TODO: We should maybe filter out symlinks?
                         yield abs_path
 
     @classmethod

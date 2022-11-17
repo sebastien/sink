@@ -311,6 +311,23 @@ doing this:
 $ cd / ; sudo tar fvxj ~/node-configured.tar.bz2
 ```
 
+### Tips
+
+You can use `find` to generate a snapshot that you can `sink diff` against, which is useful
+for instance if you don't have sink in a container and want to see what's available.
+
+```
+find . -name "*" -not -type d | cut -d/ -f2- | sort | uniq > snap.lst
+sink diff . snap.lst
+```
+
+When troubleshooting your filters, you can compare `sink snap` and `find`:
+
+```
+find . -name "*" -not -type d | cut -d/ -f2- | sort | uniq > a.lst
+time sink snap  -snone . | sort | uniq > b.lst
+```
+
 ## Formats
 ### Snapshot Format
 ### Delta Format

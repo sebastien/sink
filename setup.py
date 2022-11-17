@@ -27,14 +27,16 @@ copies of a single directory.
 
 setup(
     name="sink",
-    version="1.1.0",
-    author="Sebastien Pierre", author_email="sebastien@type-z.org",
-    description=SUMMARY, long_description=DESCRIPTION,
+    version="2.0.0",
+    author="Sebastien Pierre",
+    author_email="sebastien.pierre@gmail.com",
+    description=SUMMARY,
+    long_description=DESCRIPTION,
     license="Revised BSD License",
     keywords="change detection, synchronization",
     url="http://github.com/sebastien/sink",
     download_url="http://github.com/sebastien/sink/tarball/master",
-    package_dir={"": "src"},
+    package_dir={"": "src/py"},
     packages=["sink"],
     scripts=["bin/sink"],
     classifiers=[
@@ -51,7 +53,7 @@ setup(
         "Operating System :: POSIX",
         "Operating System :: Microsoft :: Windows",
         "Programming Language :: Python",
-    ]
+    ],
 )
 
 # EOF - vim: tw=80 ts=4 sw=4 fenc=latin-1 noet
