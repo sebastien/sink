@@ -75,6 +75,7 @@ def snap(
     *,
     # TODO: the cli module does not take care of defaults
     path: str = ".",
+    format: str = " {status} {path}",
     output: Optional[str] = None,
     ignores: Optional[list[str]] = None,
     accepts: Optional[list[str]] = None,

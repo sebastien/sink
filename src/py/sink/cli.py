@@ -1,6 +1,7 @@
-from typing import Callable, Optional, NamedTuple, Generic, TypeVar
+from typing import Callable, Optional, NamedTuple, Generic, TypeVar, Any
 from contextlib import contextmanager
 import argparse
+import inspect
 import re
 import sys
 
@@ -22,6 +23,12 @@ RE_ARG = re.compile(r"\s*(?P<arg>[a-z0-9]+|[A-Z]+):(?P<text>.*)$")
 # then be fed to `argparse`.
 TArgument = tuple[list[str], dict[str, str]]
 COMMANDS: dict[str, "Command"] = {}
+
+
+def camelCase(text: str) -> str:
+    return "".join(
+        _.lower() if i == 0 else _.capitalize() for i, _ in enumerate(text.split("-"))
+    )
 
 
 @contextmanager
@@ -115,12 +122,26 @@ def command(
                 # We add the value to the `cli_args`
                 cli_args[arg] = (p_args, p_kwargs)
 
+    # We convert the arg names
+    pythonArgNames = {camelCase(_): _ for _ in cli_args}
+
     # That's the decorator's wrapper
     def wrapper(f: Callable, alias=alias):
         # We now extract the arguments help from the command line
         # help, and update the `cli_args` accordingly.
         doc: list[str] = []
         arg_doc: dict[str, str] = {}
+        # We merge in the default values, this is a bit annoying to do, but
+        # we need to map python arg names to CLI arg names, which don't use
+        # the same convention.
+        arg_spec = inspect.getfullargspec(f)
+        if arg_spec.defaults:
+            for i, k in enumerate(arg_spec.args):
+                kk = pythonArgNames[k]
+                cli_args[kk][1].setdefault("default", arg_spec.defaults[i])
+        for k, v in (arg_spec.kwonlydefaults or {}).items():
+            kk = pythonArgNames[k]
+            cli_args[kk][1].setdefault("default", v)
         for line in (f.__doc__ or "").split("\n"):
             if not (m := RE_ARG.match(line)):
                 doc.append(line)
@@ -140,11 +161,11 @@ def command(
         # We register the commands now
         c_doc = RE_SPACES.sub(" ", " ".join(doc).strip())
         cmd = Command(
-            f,
-            c_doc,
-            cli_args,
-            options or [],
-            [_.strip() for _ in (alias or "").split("|") if _.strip()],
+            functor=f,
+            doc=c_doc,
+            args=cli_args,
+            options=options or [],
+            aliases=[_.strip() for _ in (alias or "").split("|") if _.strip()],
         )
         COMMANDS[f.__name__.lstrip("_")] = cmd
         return f
