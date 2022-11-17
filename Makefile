@@ -6,12 +6,14 @@ SOURCES_PY:=$(wildcard src/py/*.py src/py/*/*.py src/py/*/*/*.py src/py/*/*/*/*.
 PATH_LOCAL_PY=$(firstword $(shell python -c "import sys,pathlib;sys.stdout.write(' '.join([_ for _ in sys.path if _.startswith(str(pathlib.Path.home()))] ))"))
 PATH_LOCAL_BIN=~/.local/bin
 
-try-install:
+install:
 	@for file in $(SOURCES_BIN); do
-		ln -sfr $$file $(PATH_LOCAL_BIN)/$$(basename $$file)
+		echo "Installing $(PATH_LOCAL_BIN)/$$(basename $$file)"
+		ln -sfr $$file "$(PATH_LOCAL_BIN)/$$(basename $$file)"
 	done
 	if [ -s "$(PATH_LOCAL_PY)" ]; then
 		for module in $(PYTHON_MODULES); do
+			echo "Instaling $(PATH_LOCAL_PY)/$$module"
 			ln -sfr src/py/$$module "$(PATH_LOCAL_PY)"/$$module
 		done
 	fi

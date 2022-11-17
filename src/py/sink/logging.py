@@ -53,6 +53,7 @@ def fmtPairs(data: dict):
 
 
 def show(data: Union[Log, Metric, Event]):
+    return None
     if isinstance(data, Event):
         print(f" → {data.name}: {fmtJSON(data.value)}")
     elif isinstance(data, Metric):

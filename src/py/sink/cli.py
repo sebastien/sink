@@ -13,7 +13,7 @@ T = TypeVar("T")
 
 RE_SPACES = re.compile(r"\s+")
 RE_COMMAND = re.compile(
-    r"((-(?P<short>[a-z0-9]))?(\|?--(?P<long>[a-z0-9\-]+))|(?P<arg>[A-Z]+))(?P<card>[\?\*\+]?)"
+    r"((-(?P<short>[a-zA-Z0-9]))?(\|?--(?P<long>[a-z0-9\-]+))|(?P<arg>[A-Z]+))(?P<card>[\?\*\+]?)"
 )
 RE_ARG = re.compile(r"\s*(?P<arg>[a-z0-9]+|[A-Z]+):(?P<text>.*)$")
 
@@ -163,6 +163,12 @@ class CLI(Generic[T]):
         sys.stdout.write(text)
 
 
+def camelCase(text: str) -> str:
+    return "".join(
+        _.lower() if i == 0 else _.capitalize() for i, _ in enumerate(text.split("-"))
+    )
+
+
 # --
 # This is the entry point to process the command line function registered
 # in the `COMMANDS` mapping.
@@ -204,7 +210,7 @@ def run(
         fun, _, cmd_args, options, _ = COMMANDS[cmd_name]
         # FIXME: The conversation to lower here is likely to break at some point
         # TODO: Should pass parsed there
-        fun_kwargs = {k.lower(): getattr(parsed, k.lower()) for k in cmd_args}
+        fun_kwargs = {camelCase(k): getattr(parsed, k.lower()) for k in cmd_args}
         try:
             result = fun(CLI(context), **fun_kwargs)
         except TypeError as e:

@@ -1,10 +1,11 @@
 from .cli import command, write, run, CLI
-from .utils import gitignored, difftool
+from .utils import gitignored, difftool, shell, patterns, pathset
 from .snap import snapshot
 from .diff import diff as _diff
 from .model import Snapshot, Status
-from typing import Optional, NamedTuple
+from typing import Optional, NamedTuple, cast
 from pathlib import Path
+from re import Pattern
 
 
 # --
@@ -13,12 +14,12 @@ from pathlib import Path
 # Defines the primary commands available through the Sink CLI.
 
 O_STANDARD = ["-o|--output", "-f|--format"]
-O_FILTERS = ["-i|--ignores+", "-a|--accepts"]
+O_FILTERS = ["-i|--ignores", "-I|--ignore-set", "-a|--accepts", "-A|--accept-set"]
 
 
 class Filters(NamedTuple):
-    rejects: Optional[list[str]] = None
-    accepts: Optional[list[str]] = None
+    rejects: Optional[Pattern[str]] = None
+    accepts: Optional[Pattern[str]] = None
 
 
 class DiffRange(NamedTuple):
@@ -26,15 +27,35 @@ class DiffRange(NamedTuple):
     sources: Optional[list[int]] = None
 
 
+def makePattern(
+    items: Optional[list[str]], setlist: Optional[list[str]], sets: dict[str, list[str]]
+):
+    """A helper function for filters"""
+    if items or setlist:
+        res = items if items else []
+        for s in setlist or []:
+            res += sets[s]
+        return patterns(res)
+    else:
+        return None
+
+
 def filters(
     *,
     rejects: Optional[list[str]] = None,
     accepts: Optional[list[str]] = None,
+    rejectSet: Optional[list[str]] = None,
+    acceptSet: Optional[list[str]] = None,
 ) -> Filters:
-    if rejects or accepts:
-        return Filters(rejects, accepts)
+    sets: dict[str, list[str]] = {
+        _: pathset(_) for _ in set((rejectSet or []) + (acceptSet or []))
+    }
+    accepted = makePattern(accepts, acceptSet, sets)
+    rejected = makePattern(rejects, rejectSet, sets)
+    if rejected or accepted:
+        return Filters(accepted, rejected)
     else:
-        return Filters(gitignored(), accepts)
+        return Filters(patterns(sets.get("gitignore", gitignored())), patterns(accepts))
 
 
 def parseDiffRanges(ranges: Optional[list[str]]) -> DiffRange:
@@ -80,6 +101,9 @@ def parseDiffRange(text: str) -> DiffRange:
     return DiffRange(rows, sources)
 
 
+MODES = ["untracked"]
+
+
 @command("PATH", *(O_STANDARD + O_FILTERS))
 def snap(
     cli: CLI,
@@ -89,14 +113,34 @@ def snap(
     format: Optional[str] = None,
     ignores: Optional[list[str]] = None,
     accepts: Optional[list[str]] = None,
+    ignoreSet: Optional[list[str]] = None,
+    acceptSet: Optional[list[str]] = None,
 ):
     """Takes a snapshot of the given file location."""
+
+    f = filters(
+        rejects=ignores, accepts=accepts, rejectSet=ignoreSet, acceptSet=acceptSet
+    )
     s = snapshot(
-        path, accepts=accepts, rejects=gitignored() if ignores is None else ignores
+        path,
+        accepts=f.accepts,
+        rejects=f.rejects,
     )
     with write(output) as f:
         for path in s.nodes:
             f.write(f"{path}\n")
+
+
+@command("PATH?", "-s|--set?")
+def _list(
+    cli: CLI,
+    *,
+    path: str,
+    set: Optional[str] = None,
+):
+    if set:
+        for item in pathset(set):
+            print(item)
 
 
 SOURCES = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -113,11 +157,16 @@ def diff(
     tool: Optional[str] = None,
     ignores: Optional[list[str]] = None,
     accepts: Optional[list[str]] = None,
+    ignoreSet: Optional[list[str]] = None,
+    acceptSet: Optional[list[str]] = None,
 ):
     """Compares the different snapshots of file locations."""
-    f = filters(rejects=ignores, accepts=accepts)
+    f = filters(
+        rejects=ignores, accepts=accepts, rejectSet=ignoreSet, acceptSet=acceptSet
+    )
     snaps: list[Snapshot] = [
-        snapshot(_, accepts=f.accepts, rejects=f.rejects) for _ in path
+        snapshot(_, accepts=patterns(f.accepts), rejects=patterns(f.rejects))
+        for _ in path
     ]
     # This format the output like
     #                              [A] ← src/py

@@ -2,6 +2,7 @@ import os
 import hashlib
 from pathlib import Path
 from typing import Optional, Iterable, NamedTuple, TextIO, Set, Union
+import sys, json
 
 # --
 # # Snap
@@ -147,7 +148,6 @@ def compare(paths: Iterable[str]) -> Iterable[tuple[str, list[str]]]:
 # for path, entries in compare(SOURCES):
 #     print(f"{SEP.join(entries)}{SEP}{path}")
 
-import sys, json
 
 for element in walk(sys.argv[1]):
     json.dump(element, sys.stdout)

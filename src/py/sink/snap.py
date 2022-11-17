@@ -2,6 +2,7 @@ from typing import Iterator
 import os
 import stat
 import hashlib
+from re import Pattern
 from .model import Node, NodeType, NodeMeta, Snapshot, Optional
 from .utils import matches
 from .logging import metric
@@ -14,8 +15,8 @@ class FileSystem:
     def walk(
         cls,
         path: str,
-        accepts: Optional[list[str]] = None,
-        rejects: Optional[list[str]] = None,
+        accepts: Optional[Pattern[str]] = None,
+        rejects: Optional[Pattern[str]] = None,
         followLinks: bool = False,
     ) -> Iterator[str]:
         """Does a breadth-first walk of the filesystem, yielding non-directory
@@ -40,8 +41,8 @@ class FileSystem:
         cls,
         path: str,
         *,
-        accepts: Optional[list[str]] = None,
-        rejects: Optional[list[str]] = None,
+        accepts: Optional[Pattern[str]] = None,
+        rejects: Optional[Pattern[str]] = None,
     ) -> Iterator[Node]:
         """Walks the given path and produces nodes augmented with metadata"""
         offset = len(path) + 1
@@ -93,8 +94,8 @@ class FileSystem:
 def snapshot(
     path: str,
     *,
-    accepts: Optional[list[str]] = None,
-    rejects: Optional[list[str]] = None,
+    accepts: Optional[Pattern[str]] = None,
+    rejects: Optional[Pattern[str]] = None,
 ) -> Snapshot:
     """Creates a snapshot for the given `path`, given the `accepts` and `rejects`
     filters."""
