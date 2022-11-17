@@ -4,7 +4,7 @@ import stat
 import hashlib
 from re import Pattern
 from .model import Node, NodeType, NodeMeta, Snapshot, Optional
-from .utils import matches
+from .matching import matches
 from .logging import metric
 
 

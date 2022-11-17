@@ -18,17 +18,17 @@ With sink, you can:
 
 Here are few uses cases where `sink` comes in handy:
 
-- Compare multiple versions of a source tree (replacing `diff -r`)
-- Manually merge directories outside of a revision control system
-- Synchronize files belonging to different directories
-- Track changes made to specific directory
-- Implement incremental backup and restor
-- Detect changes made to configuration fiels
-- DIY version control system
+- Compare multiple versions of a source tree (replacing `diff -r`): `sink diff A B C D`
+- Manually merge directories outside of a revision control system: `sink diff -r . ../project-otherbranch`
+- Synchronize files belonging to different directories: `sink delta A B | sink patch B`
+- Track changes made to specific directory: `sink snap . -o snapshot.lst; sink diff . snapshot.lst`
+- Implement incremental backup and restore: `sink snap . -o ~/.backups/manifest.1.lst` and later `sink delta . ~/.backups/manifest.1.lst | sink patch backup.tar.bz2`
+- Detect changes made to configuration files: `sink snap --store /etc` and later `sink diff --store /etc`
+- DIY version control system: …
 
 # Quickstart
 
-`sink` simply requires Python (2.7, 3+) to run. To install it, simply do:
+`sink` simply requires Python (3+) to run. To install it, simply do:
 
 ```
 python -m pip install --user sink
@@ -310,3 +310,8 @@ doing this:
 ```
 $ cd / ; sudo tar fvxj ~/node-configured.tar.bz2
 ```
+
+## Formats
+### Snapshot Format
+### Delta Format
+

@@ -1,11 +1,11 @@
 from .cli import command, write, run, CLI
-from .utils import gitignored, difftool, shell, patterns, pathset
+from .utils import difftool, shell
 from .snap import snapshot
 from .diff import diff as _diff
 from .model import Snapshot, Status
+from .matching import RawFilters, filters, matches, gitignored, filterset
 from typing import Optional, NamedTuple, cast
 from pathlib import Path
-from re import Pattern
 
 
 # --
@@ -17,45 +17,9 @@ O_STANDARD = ["-o|--output", "-f|--format"]
 O_FILTERS = ["-i|--ignores", "-I|--ignore-set", "-a|--accepts", "-A|--accept-set"]
 
 
-class Filters(NamedTuple):
-    rejects: Optional[Pattern[str]] = None
-    accepts: Optional[Pattern[str]] = None
-
-
 class DiffRange(NamedTuple):
     rows: Optional[list[int]] = None
     sources: Optional[list[int]] = None
-
-
-def makePattern(
-    items: Optional[list[str]], setlist: Optional[list[str]], sets: dict[str, list[str]]
-):
-    """A helper function for filters"""
-    if items or setlist:
-        res = items if items else []
-        for s in setlist or []:
-            res += sets[s]
-        return patterns(res)
-    else:
-        return None
-
-
-def filters(
-    *,
-    rejects: Optional[list[str]] = None,
-    accepts: Optional[list[str]] = None,
-    rejectSet: Optional[list[str]] = None,
-    acceptSet: Optional[list[str]] = None,
-) -> Filters:
-    sets: dict[str, list[str]] = {
-        _: pathset(_) for _ in set((rejectSet or []) + (acceptSet or []))
-    }
-    accepted = makePattern(accepts, acceptSet, sets)
-    rejected = makePattern(rejects, rejectSet, sets)
-    if rejected or accepted:
-        return Filters(accepted, rejected)
-    else:
-        return Filters(patterns(sets.get("gitignore", gitignored())), patterns(accepts))
 
 
 def parseDiffRanges(ranges: Optional[list[str]]) -> DiffRange:
@@ -103,14 +67,15 @@ def parseDiffRange(text: str) -> DiffRange:
 
 MODES = ["untracked"]
 
-
-@command("PATH", *(O_STANDARD + O_FILTERS))
+# TODO: Add -s for the filterset
+# TODO: Seems that snap
+@command("PATH?", *(O_STANDARD + O_FILTERS))
 def snap(
     cli: CLI,
     *,
-    path: str,
+    # TODO: the cli module does not take care of defaults
+    path: str = ".",
     output: Optional[str] = None,
-    format: Optional[str] = None,
     ignores: Optional[list[str]] = None,
     accepts: Optional[list[str]] = None,
     ignoreSet: Optional[list[str]] = None,
@@ -131,16 +96,33 @@ def snap(
             f.write(f"{path}\n")
 
 
-@command("PATH?", "-s|--set?")
+@command("PATH?", "-s|--set?", "-I|--ignore-set", "-A|--accept-set", "-f|--format")
 def _list(
     cli: CLI,
     *,
-    path: str,
+    path: str = ".",
     set: Optional[str] = None,
+    format: Optional[str] = "{status} {path}",
+    ignoreSet: Optional[list[str]] = None,
+    acceptSet: Optional[list[str]] = None,
 ):
+    sets: list[Rawfilter] = []
     if set:
-        for item in pathset(set):
-            print(item)
+        sets.append(filterset(set))
+    for ignoreSet in ignoreSet or []:
+        sets.append(RawFilters(accepts=None, rejects=filterset(ignoreSet).rejects))
+    for acceptSet in acceptSet or []:
+        sets.append(RawFilters(accepts=filterset(acceptSet).accepts, rejects=None))
+
+    i: int = 0
+    template: str = format if format else "{status} {path}"
+    for f in sets:
+        for path in f.accepts or ():
+            print(template.format(number=i, status="+", path=path))
+            i += 1
+        for path in f.rejects or ():
+            print(template.format(number=i, status="-", path=path))
+            i += 1
 
 
 SOURCES = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"

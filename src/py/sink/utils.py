@@ -1,6 +1,6 @@
 import dataclasses
 from json import dumps, dump, JSONEncoder
-from typing import Any, Optional, TextIO, Iterable
+from typing import Any, Optional, TextIO, Iterable, NamedTuple
 from pathlib import Path
 import re
 import os
@@ -23,33 +23,6 @@ def asJSON(value: Any, stream: Optional[TextIO] = None) -> Optional[str]:
         return dumps(value, cls=EnhancedJSONEncoder)
 
 
-def patterns(
-    patterns: Optional[Iterable[str]], *, exact=False
-) -> Optional[re.Pattern[str]]:
-    """We compile expressions to regexes as we're going to run a ton of them. This
-    is for exact matches"""
-    if patterns is None:
-        return None
-    expr = "|".join(
-        fnmatch.translate(_).lstrip("(?s:").rstrip(")\\Z") for _ in patterns
-    )
-    return re.compile(f"^({expr})$" if exact else f"^(.*/)?({expr})(/.*)?$")
-
-
-def matches(
-    value: str,
-    accepts: Optional[re.Pattern[str]] = None,
-    rejects: Optional[re.Pattern[str]] = None,
-) -> bool:
-    """Tells if the given value passes the `accepts` and `rejects` filters."""
-    if rejects and rejects.match(value):
-        return False
-    elif accepts and not accepts.match(value):
-        return False
-    else:
-        return True
-
-
 def dotfile(name: str, base: Optional[Path] = None) -> Optional[Path]:
     """Looks for the file `name` in the current directory or its ancestors"""
     user_home: Optional[str] = os.getenv("HOME")
@@ -64,20 +37,6 @@ def dotfile(name: str, base: Optional[Path] = None) -> Optional[Path]:
     return None
 
 
-def gitignored(path: Optional[Path] = None) -> list[str]:
-    """Returns the list of patterns that are part of the `gitignore` file."""
-    path = dotfile(".gitignore") if not path else path
-    res: list[str] = []
-    if path and path.exists():
-        with open(path, "rt") as f:
-            for pattern in f.readlines():
-                pattern = pattern.strip().rstrip("\n")
-                if pattern.startswith("#"):
-                    continue
-                res.append(pattern)
-    return res
-
-
 def difftool(origin: Path, *other: Path):
     # NOTE: We assume 2 way diff for now
     tool: str = os.getenv("SINK_DIFF") or os.getenv("DIFFTOOL") or "diff -u"
@@ -87,24 +46,6 @@ def difftool(origin: Path, *other: Path):
         subprocess.run(cmd, capture_output=False)
 
         # shell.
-
-
-def pathset(collection: str) -> list[str]:
-    match collection:
-        case "git":
-            return [
-                _
-                for _ in str(
-                    shell(["git", "ls-tree", "-r", "HEAD", "--name-only"]), "utf8"
-                ).split("\n")
-                if _.strip()
-            ]
-        case "gitignore":
-            return gitignored()
-        case _:
-            raise ValueError(
-                f"Unsupported category '{collection}', pick one of: git, gitignore"
-            )
 
 
 class CommandError(RuntimeError):
