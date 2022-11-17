@@ -15,8 +15,10 @@ class FileSystem:
     def walk(
         cls,
         path: str,
+        *,
         accepts: Optional[Pattern[str]] = None,
         rejects: Optional[Pattern[str]] = None,
+        keeps: Optional[Pattern[str]] = None,
         followLinks: bool = False,
     ) -> Iterator[str]:
         """Does a breadth-first walk of the filesystem, yielding non-directory
@@ -26,7 +28,7 @@ class FileSystem:
             base_path = queue.pop()
             # TODO: It may be better to use os.walk there...
             for rel_path in os.listdir(base_path):
-                if matches(rel_path, accepts, rejects):
+                if matches(rel_path, accepts=accepts, rejects=rejects, keeps=keeps):
                     abs_path = f"{base_path}/{rel_path}"
                     if not followLinks and os.path.islink(abs_path):
                         continue
@@ -43,11 +45,14 @@ class FileSystem:
         *,
         accepts: Optional[Pattern[str]] = None,
         rejects: Optional[Pattern[str]] = None,
+        keeps: Optional[Pattern[str]] = None,
     ) -> Iterator[Node]:
         """Walks the given path and produces nodes augmented with metadata"""
         offset = len(path) + 1
         snap_paths = metric("snap.paths")
-        for path in cls.walk(path, accepts, rejects, followLinks=False):
+        for path in cls.walk(
+            path, accepts=accepts, rejects=rejects, keeps=keeps, followLinks=False
+        ):
             if os.path.exists(path):
                 meta = cls.meta(path)
                 node_type = (
@@ -96,10 +101,13 @@ def snapshot(
     *,
     accepts: Optional[Pattern[str]] = None,
     rejects: Optional[Pattern[str]] = None,
+    keeps: Optional[Pattern[str]] = None,
 ) -> Snapshot:
     """Creates a snapshot for the given `path`, given the `accepts` and `rejects`
     filters."""
-    return Snapshot(FileSystem.nodes(path, accepts=accepts, rejects=rejects))
+    return Snapshot(
+        FileSystem.nodes(path, accepts=accepts, rejects=rejects, keeps=keeps)
+    )
 
 
 # EOF

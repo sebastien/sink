@@ -1,59 +1,140 @@
 from typing import NamedTuple, Iterable, Optional
 import re
 import fnmatch
+from enum import Enum
 from pathlib import Path
 from .utils import shell, dotfile
+
+
+# --
+# We define filters which have three levels: rejects, keeps, and accepts.
+# Rejected filters will reject any matching file, except if it matches a
+# keep. Reject/keeps act as an "excludes" filter. The accepts filter is
+# only used when you need a restricted set of files, ie "includes.".
 
 
 class RawFilters(NamedTuple):
     rejects: Optional[list[str]] = None
     accepts: Optional[list[str]] = None
+    keeps: Optional[list[str]] = None
 
 
 class Filters(NamedTuple):
     rejects: Optional[re.Pattern[str]] = None
     accepts: Optional[re.Pattern[str]] = None
+    keeps: Optional[re.Pattern[str]] = None
+
+
+class FilterCategory(Enum):
+    Rejects = 0
+    Accepts = 1
+    Keeps = 2
+
+
+def makeFilterList(
+    items: Optional[list[str]],
+    setlist: Optional[list[str]],
+    sets: dict[str, RawFilters],
+    category: FilterCategory,
+) -> Optional[list[str]]:
+    """A helper function for filters"""
+    if items or setlist:
+        res: list[str] = items if items else []
+        for s in setlist or []:
+            if not sets:
+                raise RuntimeError(
+                    f"Given sets is empty, cannot retrieve set '{s}': {sets}"
+                )
+            elif s not in sets:
+                raise ValueError(
+                    f"Unknown set '{s}', pick one of: {', '.join(_ for _ in sets)}"
+                )
+            res += sets[s][category.value] or []
+        return res
+    else:
+        return None
 
 
 def makePattern(
     items: Optional[list[str]],
     setlist: Optional[list[str]],
     sets: dict[str, RawFilters],
-    accepts=True,
-):
+    category: FilterCategory,
+) -> Optional[re.Pattern]:
     """A helper function for filters"""
-    if items or setlist:
-        res = items if items else []
-        for s in setlist or []:
-            res += sets[s].accepts if accepts else sets[s].rejects
-        return patterns(res)
+    return pattern(makeFilterList(items, setlist, sets, category))
+
+
+def combine(a: Optional[list[str]], b: Optional[list[str]]) -> Optional[list[str]]:
+    return None if a is None and b is None else (a or []) + (b or [])
+
+
+def rawfilters(
+    *,
+    rejects: Optional[list[str]] = None,
+    accepts: Optional[list[str]] = None,
+    keeps: Optional[list[str]] = None,
+    rejectSet: Optional[list[str]] = None,
+    acceptSet: Optional[list[str]] = None,
+    keepSet: Optional[list[str]] = None,
+    filterSet: Optional[list[str]] = None,
+) -> RawFilters:
+    sets: dict[str, RawFilters] = {
+        _: filterset(_)
+        for _ in set(
+            (rejectSet or []) + (acceptSet or []) + (keepSet or []) + (filterSet or [])
+        )
+    }
+    accepted = makeFilterList(
+        accepts, combine(acceptSet, filterSet), sets, FilterCategory.Accepts
+    )
+    rejected = makeFilterList(
+        rejects, combine(rejectSet, filterSet), sets, FilterCategory.Rejects
+    )
+    kept = makeFilterList(
+        keeps, combine(keepSet, filterSet), sets, FilterCategory.Keeps
+    )
+    if rejected is None and accepted is None and kept is None:
+        f = gitignored()
+        return RawFilters(accepts=None, rejects=f.rejects, keeps=f.keeps)
     else:
-        return None
+        return RawFilters(accepts=accepted, rejects=rejected, keeps=kept)
 
 
 def filters(
     *,
     rejects: Optional[list[str]] = None,
     accepts: Optional[list[str]] = None,
+    keeps: Optional[list[str]] = None,
     rejectSet: Optional[list[str]] = None,
     acceptSet: Optional[list[str]] = None,
+    keepSet: Optional[list[str]] = None,
+    filterSet: Optional[list[str]] = None,
 ) -> Filters:
     sets: dict[str, RawFilters] = {
-        _: filterset(_) for _ in set((rejectSet or []) + (acceptSet or []))
+        _: filterset(_)
+        for _ in set(
+            (rejectSet or []) + (acceptSet or []) + (keepSet or []) + (filterSet or [])
+        )
     }
-    accepted = makePattern(accepts, acceptSet, sets, accepts=True)
-    rejected = makePattern(rejects, rejectSet, sets, accepts=False)
-    if rejected or accepted:
-        return Filters(accepted, rejected)
+    accepted = makePattern(
+        accepts, combine(acceptSet, filterSet), sets, FilterCategory.Accepts
+    )
+    rejected = makePattern(
+        rejects, combine(rejectSet, filterSet), sets, FilterCategory.Rejects
+    )
+    kept = makePattern(keeps, combine(keepSet, filterSet), sets, FilterCategory.Keeps)
+    if rejected or accepted or kept:
+        return Filters(accepts=accepted, rejects=rejected, keeps=kept)
     else:
         f = gitignored()
-        return Filters(patterns(f.accepts), patterns(f.rejects))
+        return Filters(accepts=None, rejects=pattern(f.rejects), keeps=pattern(f.keeps))
 
 
 RE_EXACT = re.compile(r"^(/|./)(?P<path>.*)$")
 
 
-def patterns(
+def pattern(
     patterns: Optional[Iterable[str]],
 ) -> Optional[re.Pattern[str]]:
     """We compile expressions to regexes as we're going to run a ton of them. This
@@ -83,13 +164,16 @@ def patterns(
 
 def matches(
     value: str,
+    *,
     accepts: Optional[re.Pattern[str]] = None,
     rejects: Optional[re.Pattern[str]] = None,
+    keeps: Optional[re.Pattern[str]] = None,
 ) -> bool:
     """Tells if the given value passes the `accepts` and `rejects` filters."""
     if rejects and rejects.match(value):
-        return False
-    elif accepts and not accepts.match(value):
+        if not (keeps and keeps.match(value)):
+            return False
+    if accepts and not accepts.match(value):
         return False
     else:
         return True
@@ -98,6 +182,8 @@ def matches(
 def filterset(collection: str) -> RawFilters:
     """Returns"""
     match collection:
+        case "none":
+            return RawFilters()
         case "git":
             return RawFilters(
                 accepts=[
@@ -119,7 +205,7 @@ def filterset(collection: str) -> RawFilters:
 def gitignored(path: Optional[Path] = None) -> RawFilters:
     """Returns the list of patterns that are part of the `gitignore` file."""
     path = dotfile(".gitignore") if not path else path
-    accepts: list[str] = []
+    keeps: list[str] = []
     rejects: list[str] = []
     if path and path.exists():
         with open(path, "rt") as f:
@@ -128,7 +214,10 @@ def gitignored(path: Optional[Path] = None) -> RawFilters:
                 if pattern.startswith("#") or not pattern:
                     continue
                 if pattern.startswith("!"):
-                    accepts.append(pattern[1:])
+                    keeps.append(pattern[1:])
                 else:
                     rejects.append(pattern)
-    return RawFilters(accepts=accepts, rejects=rejects)
+    return RawFilters(keeps=keeps, rejects=rejects)
+
+
+# EOF

@@ -140,6 +140,8 @@ def command(
                 kk = pythonArgNames[k]
                 cli_args[kk][1].setdefault("default", arg_spec.defaults[i])
         for k, v in (arg_spec.kwonlydefaults or {}).items():
+            if k not in pythonArgNames:
+                continue
             kk = pythonArgNames[k]
             cli_args[kk][1].setdefault("default", v)
         for line in (f.__doc__ or "").split("\n"):

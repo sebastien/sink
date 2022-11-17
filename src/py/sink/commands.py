@@ -3,7 +3,15 @@ from .utils import difftool, shell
 from .snap import snapshot
 from .diff import diff as _diff
 from .model import Snapshot, Status
-from .matching import RawFilters, filters, matches, gitignored, filterset
+from .matching import (
+    RawFilters,
+    filters,
+    rawfilters,
+    matches,
+    gitignored,
+    filterset,
+    pattern,
+)
 from typing import Optional, NamedTuple, cast
 from pathlib import Path
 
@@ -14,7 +22,15 @@ from pathlib import Path
 # Defines the primary commands available through the Sink CLI.
 
 O_STANDARD = ["-o|--output", "-f|--format"]
-O_FILTERS = ["-i|--ignores", "-I|--ignore-set", "-a|--accepts", "-A|--accept-set"]
+O_FILTERS = [
+    "-i|--ignores",
+    "-I|--ignore-set",
+    "-k|--keeps",
+    "-K|--keep-set",
+    "-a|--accepts",
+    "-A|--accept-set",
+    "-s|--filter-set",
+]
 
 
 class DiffRange(NamedTuple):
@@ -79,13 +95,22 @@ def snap(
     output: Optional[str] = None,
     ignores: Optional[list[str]] = None,
     accepts: Optional[list[str]] = None,
+    keeps: Optional[list[str]] = None,
     ignoreSet: Optional[list[str]] = None,
     acceptSet: Optional[list[str]] = None,
+    keepSet: Optional[list[str]] = None,
+    filterSet: Optional[list[str]] = None,
 ):
     """Takes a snapshot of the given file location."""
 
     f = filters(
-        rejects=ignores, accepts=accepts, rejectSet=ignoreSet, acceptSet=acceptSet
+        rejects=ignores,
+        accepts=accepts,
+        keeps=keeps,
+        rejectSet=ignoreSet,
+        acceptSet=acceptSet,
+        keepSet=keepSet,
+        filterSet=filterSet,
     )
     s = snapshot(
         path,
@@ -97,33 +122,50 @@ def snap(
             f.write(f"{path}\n")
 
 
-@command("PATH?", "-s|--set?", "-I|--ignore-set", "-A|--accept-set", "-f|--format")
-def _list(
+@command("PATH?", *(O_STANDARD + O_FILTERS))
+def _filters(
     cli: CLI,
     *,
     path: str = ".",
     set: Optional[str] = None,
+    output: Optional[str] = None,
     format: Optional[str] = "{status} {path}",
+    ignores: Optional[list[str]] = None,
+    accepts: Optional[list[str]] = None,
+    keeps: Optional[list[str]] = None,
     ignoreSet: Optional[list[str]] = None,
     acceptSet: Optional[list[str]] = None,
+    keepSet: Optional[list[str]] = None,
+    filterSet: Optional[list[str]] = None,
 ):
-    sets: list[Rawfilter] = []
-    if set:
-        sets.append(filterset(set))
-    for ignoreSet in ignoreSet or []:
-        sets.append(RawFilters(accepts=None, rejects=filterset(ignoreSet).rejects))
-    for acceptSet in acceptSet or []:
-        sets.append(RawFilters(accepts=filterset(acceptSet).accepts, rejects=None))
-
+    """Lists the filters active for a given set of parameters."""
+    filters = rawfilters(
+        rejects=ignores,
+        accepts=accepts,
+        keeps=keeps,
+        rejectSet=ignoreSet,
+        acceptSet=acceptSet,
+        keepSet=keepSet,
+        filterSet=filterSet,
+    )
     i: int = 0
     template: str = format if format else "{status} {path}"
-    for f in sets:
-        for path in f.accepts or ():
-            print(template.format(number=i, status="+", path=path))
+    if not template.endswith("\n"):
+        template += "\n"
+    with write(output) as f:
+        for path in filters.rejects or ():
+            f.write(template.format(number=i, status="-", path=path))
             i += 1
-        for path in f.rejects or ():
-            print(template.format(number=i, status="-", path=path))
+
+        for path in filters.keeps or ():
+            f.write(template.format(number=i, status="~", path=path))
             i += 1
+
+        for path in filters.accepts or ():
+            f.write(template.format(number=i, status="+", path=path))
+            i += 1
+    if i == 0:
+        f.write("No active filter\n")
 
 
 SOURCES = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -140,15 +182,29 @@ def diff(
     tool: Optional[str] = None,
     ignores: Optional[list[str]] = None,
     accepts: Optional[list[str]] = None,
+    keeps: Optional[list[str]] = None,
     ignoreSet: Optional[list[str]] = None,
     acceptSet: Optional[list[str]] = None,
+    keepSet: Optional[list[str]] = None,
+    filterSet: Optional[list[str]] = None,
 ):
     """Compares the different snapshots of file locations."""
     f = filters(
-        rejects=ignores, accepts=accepts, rejectSet=ignoreSet, acceptSet=acceptSet
+        rejects=ignores,
+        accepts=accepts,
+        keeps=keeps,
+        rejectSet=ignoreSet,
+        acceptSet=acceptSet,
+        keepSet=keepSet,
+        filterSet=filterSet,
     )
     snaps: list[Snapshot] = [
-        snapshot(_, accepts=patterns(f.accepts), rejects=patterns(f.rejects))
+        snapshot(
+            _,
+            accepts=f.accepts,
+            rejects=f.rejects,
+            keeps=f.keeps,
+        )
         for _ in path
     ]
     # This format the output like
