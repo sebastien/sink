@@ -153,13 +153,14 @@ def pattern(
         "|".join(fnmatch.translate(_).lstrip("(?s:").rstrip(")\\Z") for _ in p)
         for p in (exact, partial)
     )
-    expr_exact = f"^({expr_exact})$" if exact else ""
-    expr_partial = f"^(.*/)?({expr_partial})[/$]" if partial else ""
+    expr_exact = f"({expr_exact})" if exact else ""
+    expr_partial = f"(.*/)?({expr_partial})" if partial else ""
 
-    if expr_exact and expr_partial:
-        return re.compile(f"{expr_exact}|{expr_partial}")
-    else:
-        return re.compile(expr_exact or expr_partial)
+    return re.compile(
+        f"^({expr_exact}|{expr_partial})(/.*)?*"
+        if (expr_exact and expr_partial)
+        else f"^({expr_exact or expr_partial})(/.*)*$"
+    )
 
 
 def matches(
@@ -202,11 +203,15 @@ def filterset(collection: str) -> RawFilters:
             )
 
 
+DEFAULT_KEEPS = []
+DEFAULT_REJECTS = [".git", ".svg", "*.swp", ".cache", "*.pyc"]
+
+
 def gitignored(path: Optional[Path] = None) -> RawFilters:
     """Returns the list of patterns that are part of the `gitignore` file."""
     path = dotfile(".gitignore") if not path else path
-    keeps: list[str] = []
-    rejects: list[str] = []
+    keeps: list[str] = [] + DEFAULT_KEEPS
+    rejects: list[str] = [] + DEFAULT_REJECTS
     if path and path.exists():
         with open(path, "rt") as f:
             for pattern in f.readlines():

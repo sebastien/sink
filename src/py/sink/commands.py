@@ -1,18 +1,13 @@
 from .cli import command, write, run, CLI
-from .utils import difftool, shell
+from .utils import difftool
 from .snap import snapshot
 from .diff import diff as _diff
 from .model import Snapshot, Status
 from .matching import (
-    RawFilters,
     filters,
     rawfilters,
-    matches,
-    gitignored,
-    filterset,
-    pattern,
 )
-from typing import Optional, NamedTuple, cast
+from typing import Optional, NamedTuple
 from pathlib import Path
 
 
