@@ -1,0 +1,22 @@
+When the path does not exist:
+
+    result = fun(CLI(context), **fun_kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/spierre/Workspace/sink/src/py/sink/commands.py", line 202, in diff
+    snaps: list[Snapshot] = [
+                            ^
+  File "/home/spierre/Workspace/sink/src/py/sink/commands.py", line 203, in <listcomp>
+    snapshot(
+  File "/home/spierre/Workspace/sink/src/py/sink/snap.py", line 121, in snapshot
+    return Snapshot(
+           ^^^^^^^^^
+  File "/home/spierre/Workspace/sink/src/py/sink/model.py", line 91, in __init__
+    self.extend(nodes)
+  File "/home/spierre/Workspace/sink/src/py/sink/model.py", line 94, in extend
+    for node in nodes:
+  File "/home/spierre/Workspace/sink/src/py/sink/snap.py", line 66, in nodes
+    for path in cls.walk(
+  File "/home/spierre/Workspace/sink/src/py/sink/snap.py", line 30, in walk
+    for rel_path in os.listdir(base_path):
+                    ^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '../tickerapi--main/src/tickerapi'

@@ -1,6 +1,7 @@
 from .cli import command, write, run, CLI
 from .utils import difftool
 from .snap import snapshot
+from .term import TermFont, termcolor
 from .diff import diff as _diff
 from .model import Snapshot, Status
 from .matching import (
@@ -217,12 +218,25 @@ def diff(
     sources = path
     node_paths = [_ for _ in compared]
     node_path_length = max((len(_) for _ in node_paths))
+    COLOR_FORMAT = {
+        # NOTE: I've changed the presentation here, '.' becomes '+' and
+        # '<' becomes '.'. We may
+        " ! ": f"{termcolor(237, 73, 18)}{TermFont.Bold} ! {TermFont.Reset}",
+        " - ": f"{termcolor(237, 73, 18)} - {TermFont.Reset}",
+        " > ": f"{termcolor(156, 224, 220)}{TermFont.Bold} > {TermFont.Reset}",
+        " + ": f"{termcolor(156, 224, 20)}{TermFont.Bold} + {TermFont.Reset}",
+        " . ": f"{termcolor(156, 224, 20)}{TermFont.Bold} + {TermFont.Reset}",
+        " < ": f"{termcolor(160, 160, 160)} . {TermFont.Reset}",
+    }
+
     # --
     # Header formatting
     for i, p in enumerate(sources):
+        cli.out("    ")
         cli.out(
             " ".join((" " * (node_path_length), " ┆ " * i, f"[{SOURCES[i]}] ← {p}"))
         )
+        cli.out("\n")
     # TODO: Restore that
     # cli.out(" " * node_path_length, " ".join(f" ⇣ " for _ in range(len(sources))))
 
@@ -255,7 +269,10 @@ def diff(
         print(
             f"{i:3d}",
             p.ljust(node_path_length),
-            " ".join(_.value if has_source(j) else "   " for j, _ in enumerate(nodes)),
+            " ".join(
+                COLOR_FORMAT.get(v := _.value, v) if has_source(j) else "   "
+                for j, _ in enumerate(nodes)
+            ),
         )
         # --
         # We have the -d option, so we're going to interactively review
