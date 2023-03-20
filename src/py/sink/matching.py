@@ -153,13 +153,11 @@ def pattern(
         "|".join(fnmatch.translate(_).lstrip("(?s:").rstrip(")\\Z") for _ in p)
         for p in (exact, partial)
     )
-    expr_exact = f"({expr_exact})" if exact else ""
-    expr_partial = f"(.*/)?({expr_partial})" if partial else ""
 
     return re.compile(
-        f"^({expr_exact}|{expr_partial})(/.*)?*"
+        f"^({expr_exact}|{expr_partial})(/.*)$"
         if (expr_exact and expr_partial)
-        else f"^({expr_exact or expr_partial})(/.*)*$"
+        else f"^({expr_exact or expr_partial})(/.*)$"
     )
 
 
