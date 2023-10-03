@@ -217,28 +217,31 @@ def diff(
     diff_ranges = parseDiffRanges(diff)
     sources = path
     node_paths = [_ for _ in compared]
-    node_path_length = max((len(_) for _ in node_paths))
-    COLOR_FORMAT = {
-        # NOTE: I've changed the presentation here, '.' becomes '+' and
-        # '<' becomes '.'. We may
-        " ! ": f"{termcolor(237, 73, 18)}{TermFont.Bold} ! {TermFont.Reset}",
-        " - ": f"{termcolor(237, 73, 18)} - {TermFont.Reset}",
-        " > ": f"{termcolor(156, 224, 220)}{TermFont.Bold} > {TermFont.Reset}",
-        " + ": f"{termcolor(156, 224, 20)}{TermFont.Bold} + {TermFont.Reset}",
-        " . ": f"{termcolor(156, 224, 20)}{TermFont.Bold} + {TermFont.Reset}",
-        " < ": f"{termcolor(160, 160, 160)} . {TermFont.Reset}",
-    }
+    if not node_paths:
+        cli.out("No matching paths")
+    else:
+        node_path_length = max((len(_) for _ in node_paths))
+        COLOR_FORMAT = {
+            # NOTE: I've changed the presentation here, '.' becomes '+' and
+            # '<' becomes '.'. We may
+            " ! ": f"{termcolor(237, 73, 18)}{TermFont.Bold} ! {TermFont.Reset}",
+            " - ": f"{termcolor(237, 73, 18)} - {TermFont.Reset}",
+            " > ": f"{termcolor(156, 224, 220)}{TermFont.Bold} > {TermFont.Reset}",
+            " + ": f"{termcolor(156, 224, 20)}{TermFont.Bold} + {TermFont.Reset}",
+            " . ": f"{termcolor(156, 224, 20)}{TermFont.Bold} + {TermFont.Reset}",
+            " < ": f"{termcolor(160, 160, 160)} . {TermFont.Reset}",
+        }
 
-    # --
-    # Header formatting
-    for i, p in enumerate(sources):
-        cli.out("    ")
-        cli.out(
-            " ".join((" " * (node_path_length), " ┆ " * i, f"[{SOURCES[i]}] ← {p}"))
-        )
-        cli.out("\n")
-    # TODO: Restore that
-    # cli.out(" " * node_path_length, " ".join(f" ⇣ " for _ in range(len(sources))))
+        # --
+        # Header formatting
+        for i, p in enumerate(sources):
+            cli.out("    ")
+            cli.out(
+                " ".join((" " * (node_path_length), " ┆ " * i, f"[{SOURCES[i]}] ← {p}"))
+            )
+            cli.out("\n")
+        # TODO: Restore that
+        # cli.out(" " * node_path_length, " ".join(f" ⇣ " for _ in range(len(sources))))
 
     # We defined convenience functions
     def has_source(i: int) -> bool:

@@ -28,7 +28,9 @@ class FileSystem:
             base_path = queue.pop()
             # TODO: It may be better to use os.walk there...
             for rel_path in os.listdir(base_path):
-                if matches(rel_path, accepts=accepts, rejects=rejects, keeps=keeps):
+                if not matches(rel_path, accepts=accepts, rejects=rejects, keeps=keeps):
+                    pass
+                else:
                     abs_path = f"{base_path}/{rel_path}"
                     is_link = (
                         0  # This is not a link
