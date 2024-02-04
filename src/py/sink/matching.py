@@ -1,5 +1,6 @@
 from typing import NamedTuple, Iterable, Optional
 import re
+import os
 import fnmatch
 from enum import Enum
 from pathlib import Path
@@ -206,19 +207,26 @@ DEFAULT_REJECTS = [".git", ".svg", "*.swp", ".cache", "*.pyc"]
 
 def gitignored(path: Optional[Path] = None) -> RawFilters:
     """Returns the list of patterns that are part of the `gitignore` file."""
-    path = dotfile(".gitignore") if not path else path
     keeps: list[str] = [] + DEFAULT_KEEPS
     rejects: list[str] = [] + DEFAULT_REJECTS
-    if path and path.exists():
-        with open(path, "rt") as f:
-            for pattern in f.readlines():
-                pattern = pattern.strip().rstrip("\n").strip()
-                if pattern.startswith("#") or not pattern:
-                    continue
-                if pattern.startswith("!"):
-                    keeps.append(pattern[1:])
-                else:
-                    rejects.append(pattern)
+    for p in (
+        Path(_)
+        for _ in (
+            [f"{os.environ['HOME']}/.gitignore", dotfile(".gitignore")]
+            if not path
+            else [path]
+        )
+    ):
+        if p and p.exists():
+            with open(p, "rt") as f:
+                for pattern in f.readlines():
+                    pattern = pattern.strip().rstrip("\n").strip()
+                    if pattern.startswith("#") or not pattern:
+                        continue
+                    if pattern.startswith("!"):
+                        keeps.append(pattern[1:])
+                    else:
+                        rejects.append(pattern)
     return RawFilters(keeps=keeps, rejects=rejects)
 
 
