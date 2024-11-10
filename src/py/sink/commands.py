@@ -10,6 +10,7 @@ from .matching import (
 )
 from typing import Optional, NamedTuple
 from pathlib import Path
+import json
 
 
 # --
@@ -17,15 +18,15 @@ from pathlib import Path
 #
 # Defines the primary commands available through the Sink CLI.
 
-O_STANDARD = ["-o|--output", "-f|--format"]
+O_STANDARD = ["-o|--output?", "-f|--format?"]
 O_FILTERS = [
-    "-i|--ignores",
-    "-I|--ignore-set",
-    "-k|--keeps",
-    "-K|--keep-set",
-    "-a|--accepts",
-    "-A|--accept-set",
-    "-s|--filter-set",
+    "-i|--ignores*",
+    "-I|--ignore-set*",
+    "-k|--keeps*",
+    "-K|--keep-set*",
+    "-a|--accepts*",
+    "-A|--accept-set*",
+    "-s|--filter-set*",
 ]
 
 
@@ -79,6 +80,7 @@ def parseDiffRange(text: str) -> DiffRange:
 
 MODES = ["untracked"]
 
+
 # TODO: Add -s for the filterset
 # TODO: Seems that snap
 @command("PATH?", *(O_STANDARD + O_FILTERS))
@@ -115,8 +117,11 @@ def snap(
         keeps=active_filters.keeps,
     )
     with write(output) as f:
-        for path in s.nodes:
-            f.write(f"{path}\n")
+        if format == "json":
+            json.dump(s.toPrimitive(), f)
+        else:
+            for path in s.nodes:
+                f.write(f"{path}\n")
 
 
 @command("PATH?", *(O_STANDARD + O_FILTERS))

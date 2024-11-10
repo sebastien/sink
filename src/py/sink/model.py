@@ -53,6 +53,20 @@ class NodeMeta:
     ctime: float
     mtime: float
 
+    @staticmethod
+    def FromPrimivite(value) -> "NodeMeta":
+        return NodeMeta(**value)
+
+    def toPrimitive(self) -> dict:
+        return dict(
+            mode=self.mode,
+            uid=self.uid,
+            gid=self.gid,
+            size=self.size,
+            ctime=self.ctime,
+            mtime=self.mtime,
+        )
+
 
 @dataclass
 class Node:
@@ -62,6 +76,19 @@ class Node:
     type: int
     meta: Optional[NodeMeta] = None
     sig: Optional[str] = None
+
+    @staticmethod
+    def FromPrimivite(value) -> "Node":
+        return Node(
+            path=value["path"],
+            type=value["type"],
+            meta=(
+                NodeMeta.FromPrimivite(value.get("NodeMeta"))
+                if "NodeMeta" in value
+                else None
+            ),
+            sig=value.get("sig"),
+        )
 
     def isNewer(self, other: Optional["Node"]) -> bool:
         return other.isOlder(self) if other else True
@@ -78,12 +105,30 @@ class Node:
                 else False
             )
 
+    def toPrimitive(self) -> dict:
+        return {
+            "path": self.path,
+            "type": self.type,
+            "meta": self.meta.toPrimitive() if self.meta else None,
+            "sig": self.sig,
+        }
+
     def hasChanged(self, other: Optional["Node"]) -> bool:
         return self.sig != other.sig and self.meta != other.meta if other else False
 
 
 class Snapshot:
     """Represents a collection of node states."""
+
+    @staticmethod
+    def FromPrimivite(value) -> "Snapshot":
+        return Snapshot(
+            nodes=(
+                [Node.FromPrimitive(_) for _ in value.get("nodes")]
+                if value.get("nodes")
+                else None
+            ),
+        )
 
     def __init__(self, nodes: Optional[Iterable[Node]] = None):
         self.nodes: dict[str, Node] = {}
@@ -99,6 +144,9 @@ class Snapshot:
 
     def __iter__(self) -> Iterator[Node]:
         yield from self.nodes.values()
+
+    def toPrimitive(self) -> dict:
+        return {"nodes": {k: v.toPrimitive() for k, v in self.nodes.items()}}
 
 
 class NodePredicates:
