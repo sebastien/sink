@@ -2,6 +2,7 @@ from typing import Iterator
 import os
 import stat
 import hashlib
+import json
 from re import Pattern
 from .model import Node, NodeType, NodeMeta, Snapshot, Optional
 from .matching import matches
@@ -35,16 +36,16 @@ class FileSystem:
                     is_link = (
                         0  # This is not a link
                         if not os.path.islink(abs_path)
-                        else 2  # This is a link to a directory
-                        if os.path.isdir(os.readlink(abs_path))
-                        else 1  # This is a link to not a directory
+                        else (
+                            2  # This is a link to a directory
+                            if os.path.isdir(os.readlink(abs_path))
+                            else 1
+                        )  # This is a link to not a directory
                     )
                     is_dir = (
                         True
                         if is_link == 2
-                        else False
-                        if is_link
-                        else os.path.isdir(abs_path)
+                        else False if is_link else os.path.isdir(abs_path)
                     )
                     if is_dir:
                         if not is_link or followLinks:
@@ -73,11 +74,15 @@ class FileSystem:
                 node_type = (
                     NodeType.FILE
                     if stat.S_ISREG(meta.mode)
-                    else NodeType.DIRECTORY
-                    if stat.S_ISREG(meta.mode)
-                    else NodeType.LINK
-                    if stat.S_ISLNK(meta.mode)
-                    else NodeType.SPECIAL
+                    else (
+                        NodeType.DIRECTORY
+                        if stat.S_ISREG(meta.mode)
+                        else (
+                            NodeType.LINK
+                            if stat.S_ISLNK(meta.mode)
+                            else NodeType.SPECIAL
+                        )
+                    )
                 )
                 snap_paths.inc()
                 yield Node(
@@ -120,9 +125,13 @@ def snapshot(
 ) -> Snapshot:
     """Creates a snapshot for the given `path`, given the `accepts` and `rejects`
     filters."""
-    return Snapshot(
-        FileSystem.nodes(path, accepts=accepts, rejects=rejects, keeps=keeps)
-    )
+    if path.endswith(".json"):
+        with open(path, "rt") as f:
+            return Snapshot.FromPrimitive(json.load(f))
+    else:
+        return Snapshot(
+            FileSystem.nodes(path, accepts=accepts, rejects=rejects, keeps=keeps)
+        )
 
 
 # EOF

@@ -170,6 +170,55 @@ def _filters(
         f.write("No active filter\n")
 
 
+@command("PATH+", *(O_STANDARD + O_FILTERS))
+def _list(
+    cli: CLI,
+    *,
+    path: list[str],
+    output: Optional[str] = None,
+    format: Optional[str] = "{status} {path}",
+    ignores: Optional[list[str]] = None,
+    accepts: Optional[list[str]] = None,
+    keeps: Optional[list[str]] = None,
+    ignoreSet: Optional[list[str]] = None,
+    acceptSet: Optional[list[str]] = None,
+    keepSet: Optional[list[str]] = None,
+    filterSet: Optional[list[str]] = None,
+):
+    """Prints out the paths in the given snapshot."""
+    snap: Snapshot | None = None
+    f = filters(
+        rejects=ignores,
+        accepts=accepts,
+        keeps=keeps,
+        rejectSet=ignoreSet,
+        acceptSet=acceptSet,
+        keepSet=keepSet,
+        filterSet=filterSet,
+    )
+    for s in (
+        snapshot(
+            _,
+            accepts=f.accepts,
+            rejects=f.rejects,
+            keeps=f.keeps,
+        )
+        for _ in path
+    ):
+        if snap:
+            snap = snap.extend(s.nodes.values())
+        else:
+            snap = s
+    with write(output) as f:
+        if not snap:
+            pass
+        elif format == "json":
+            json.dump(snap.toPrimitive(), f)
+        else:
+            for path in snap.nodes:
+                f.write(f"{path}\n")
+
+
 SOURCES = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 
@@ -275,7 +324,7 @@ def diff(
         # We print the row, filtering out the sources
         p, nodes = p_nodes
         print(
-            f"{i:3d}",
+            f"{i:03d}",
             p.ljust(node_path_length),
             " ".join(
                 COLOR_FORMAT.get(v := _.value, v) if has_source(j) else "   "

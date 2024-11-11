@@ -54,7 +54,7 @@ class NodeMeta:
     mtime: float
 
     @staticmethod
-    def FromPrimivite(value) -> "NodeMeta":
+    def FromPrimitive(value) -> "NodeMeta":
         return NodeMeta(**value)
 
     def toPrimitive(self) -> dict:
@@ -78,12 +78,12 @@ class Node:
     sig: Optional[str] = None
 
     @staticmethod
-    def FromPrimivite(value) -> "Node":
+    def FromPrimitive(value) -> "Node":
         return Node(
             path=value["path"],
             type=value["type"],
             meta=(
-                NodeMeta.FromPrimivite(value.get("NodeMeta"))
+                NodeMeta.FromPrimitive(value.get("NodeMeta"))
                 if "NodeMeta" in value
                 else None
             ),
@@ -121,18 +121,18 @@ class Snapshot:
     """Represents a collection of node states."""
 
     @staticmethod
-    def FromPrimivite(value) -> "Snapshot":
+    def FromPrimitive(value) -> "Snapshot":
         return Snapshot(
             nodes=(
-                [Node.FromPrimitive(_) for _ in value.get("nodes")]
+                {k: Node.FromPrimitive(v) for k, v in value.get("nodes").items()}
                 if value.get("nodes")
                 else None
             ),
         )
 
-    def __init__(self, nodes: Optional[Iterable[Node]] = None):
-        self.nodes: dict[str, Node] = {}
-        if nodes:
+    def __init__(self, nodes: Optional[Iterable[Node] | dict[str, Node]] = None):
+        self.nodes: dict[str, Node] = nodes if nodes and isinstance(nodes, dict) else {}
+        if nodes and not isinstance(nodes, dict):
             self.extend(nodes)
 
     def extend(self, nodes: Iterable[Node]):
