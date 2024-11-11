@@ -26,13 +26,21 @@ def status(origin: Optional[Node], *others: Optional[Node]) -> list[Status]:
     newer_count = 0
     older_count = 0
     changed_count = 0
+    # NOTE: Leaving this for debug
+    # row = [origin] + [_ for _ in others]
+    # path = [_ for _ in row if _][0]
+    # path = path.path if path else None
+    # print("".join(["-" if _ is None else "X" for _ in row]), path)
     for other in others:
-        if not origin:
+        if other is None:
+            if not origin:
+                res.append(Status.ABSENT)
+            else:
+                res.append(Status.REMOVED)
+                removed_count += 1
+        elif not origin:
             res.append(Status.ADDED)
             added_count += 1
-        elif not other:
-            res.append(Status.REMOVED)
-            removed_count += 1
         elif other.hasChanged(origin):
             if other.isNewer(origin):
                 res.append(Status.NEWER)
@@ -71,10 +79,15 @@ def diff(*snapshots: Snapshot) -> dict[str, list[Status]]:
     """Compares the list of snapshots, returning a list of status per snapshot"""
     states: dict[str, list[Optional[Node]]] = {}
     n: int = len(snapshots)
+    # This fills in states as a sparse matrix of nodes (rows) by
+    # snapshots.
     for i, s in enumerate(snapshots):
+        # For each node of the snapshot
         for node in s.nodes.values():
+            # We create a row if it's not there
             if node.path not in states:
                 states[node.path] = [None] * n
+            # And we assign the node
             states[node.path][i] = node
     # FIXME: The sort here may be an issue performance-wise
     return {path: status(*sources) for path, sources in sorted(states.items())}

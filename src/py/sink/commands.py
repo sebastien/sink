@@ -78,9 +78,6 @@ def parseDiffRange(text: str) -> DiffRange:
     return DiffRange(rows, sources)
 
 
-MODES = ["untracked"]
-
-
 # TODO: Add -s for the filterset
 # TODO: Seems that snap
 @command("PATH?", *(O_STANDARD + O_FILTERS))
