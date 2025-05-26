@@ -1,12 +1,9 @@
 import dataclasses
 from json import dumps, dump, JSONEncoder
-from typing import Any, Optional, TextIO, Iterable, NamedTuple
+from typing import Any, Optional, TextIO
 from pathlib import Path
-import re
 import os
-import fnmatch
-import subprocess
-
+import subprocess  # nosec: B404
 
 class EnhancedJSONEncoder(JSONEncoder):
     def default(self, o):
@@ -43,7 +40,7 @@ def difftool(origin: Path, *other: Path):
     prefix = [_ for _ in (_.strip() for _ in tool.split()) if _]
     for _ in other:
         cmd: list[str] = prefix + [origin, _]
-        subprocess.run(cmd, capture_output=False)
+        subprocess.run(cmd, capture_output=False)  # nosec: B603
 
         # shell.
 

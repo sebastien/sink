@@ -1,5 +1,6 @@
-from typing import Callable, Optional, NamedTuple, Generic, TypeVar, Any
+from typing import Any, Callable, Optional, NamedTuple, Generic, TypeVar, Iterator, cast
 from contextlib import contextmanager
+from io import TextIOWrapper
 import argparse
 import inspect
 import re
@@ -26,13 +27,14 @@ COMMANDS: dict[str, "Command"] = {}
 
 
 def camelCase(text: str) -> str:
+    """Converts the given string to `camelCase`"""
     return "".join(
         _.lower() if i == 0 else _.capitalize() for i, _ in enumerate(text.split("-"))
     )
 
 
 @contextmanager
-def write(path: Optional[str] = None, append=False):
+def write(path: Optional[str] = None, append=False) -> Iterator[TextIOWrapper]:
     """Returns a writable file-like text object"""
     output: Optional[str] = None if path in (None, "-") else path
     try:
@@ -40,7 +42,7 @@ def write(path: Optional[str] = None, append=False):
             with open(output, "at" if append else "wt") as f:
                 yield f
         else:
-            yield sys.stdout
+            yield cast(TextIOWrapper , sys.stdout)
     except Exception as e:
         raise e
     finally:
@@ -69,7 +71,7 @@ def option(*args, **kwargs):
 
 
 class Command(NamedTuple):
-    functor: Callable
+    functor: Callable[[Any], Any]
     doc: Optional[str]
     args: dict[str, TArgument]
     options: list[Callable]
@@ -186,12 +188,6 @@ class CLI(Generic[T]):
         sys.stdout.write(text)
 
 
-def camelCase(text: str) -> str:
-    return "".join(
-        _.lower() if i == 0 else _.capitalize() for i, _ in enumerate(text.split("-"))
-    )
-
-
 # --
 # This is the entry point to process the command line function registered
 # in the `COMMANDS` mapping.
@@ -239,7 +235,7 @@ def run(
         except TypeError as e:
             sys.stderr.write(
                 f"CLI arguments mismatch:\n"
-                f" - command-line options are: {', '.join(f'#{i}={_}' for i,_ in enumerate(cmd_args))}\n"
+                f" - command-line options are: {', '.join(f'#{i}={_}' for i, _ in enumerate(cmd_args))}\n"
                 f" - argument values are: {fun_kwargs}\n"
             )
             raise e

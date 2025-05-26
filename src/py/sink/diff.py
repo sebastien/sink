@@ -1,10 +1,7 @@
 from .model import Node, Snapshot, Optional, Status
-from enum import Enum
-
 
 # --
 # ## Directory diffing command
-
 
 def compareNodes(a: Optional[Node], b: Optional[Node]) -> int:
     pass

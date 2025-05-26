@@ -1,4 +1,4 @@
-from .cli import command, write, run, CLI
+from .cli import command, write, CLI
 from .utils import difftool
 from .snap import snapshot
 from .term import TermFont, termcolor
@@ -113,6 +113,8 @@ def snap(
         rejects=active_filters.rejects,
         keeps=active_filters.keeps,
     )
+    if output.endswith(".json"):
+        format = "json"
     with write(output) as f:
         if format == "json":
             json.dump(s.toPrimitive(), f)

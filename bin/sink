@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 BASE_PY=$(dirname "$(dirname "$(readlink -f "$0")")")/src/py
+if [ -z "${PYTHON:-}" ]; then
+	PYTHON=python3
+fi
 if [ -e "$BASE_PY" ]; then
 	UPDATED_PYTHONPATH=$BASE_PY:$PYTHONPATH
 else
 	UPDATED_PYTHONPATH=$PYTHONPATH
 fi
-PYTHONPATH=$UPDATED_PYTHONPATH python -m sink "$@"
+PYTHONPATH=$UPDATED_PYTHONPATH $PYTHON -m sink "$@"
 # EOF
