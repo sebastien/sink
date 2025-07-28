@@ -330,6 +330,37 @@ find . -name "*" -not -type d | cut -d/ -f2- | sort | uniq > a.lst
 time sink snap  -snone . | sort | uniq > b.lst
 ```
 
+## Development
+
+### Building from Source
+
+This project requires **GNU Make** for building and development tasks. The Makefile will automatically detect if you're using GNU Make and provide guidance if not.
+
+**Installation:**
+- **macOS**: `brew install make` (then use `gmake` command)
+- **Ubuntu/Debian**: `apt-get install make`
+- **CentOS/RHEL**: `yum install make`
+
+**Building:**
+```bash
+# If you have GNU Make as 'make':
+make prep          # Install dependencies
+make check         # Run all checks (security, linting, typing)
+make compile       # Compile with mypyc
+
+# If you need to use 'gmake':
+gmake prep
+gmake check
+gmake compile
+
+# Or use the provided wrapper:
+./gmake.sh prep
+./gmake.sh check
+./gmake.sh compile
+```
+
+The build system automatically refreshes dependencies weekly to ensure you have the latest versions of development tools.
+
 ## Formats
 ### Snapshot Format
 ### Delta Format

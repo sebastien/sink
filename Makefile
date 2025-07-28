@@ -1,5 +1,22 @@
 
 # --
+# ## Make Version Detection & Enforcement
+
+# Detect if we're running under GNU Make
+MAKE_VERSION := $(shell $(MAKE) --version 2>/dev/null | head -1)
+IS_GMAKE := $(if $(findstring GNU Make,$(MAKE_VERSION)),1,0)
+
+# If not GNU Make, check for gmake and provide guidance
+ifneq ($(IS_GMAKE),1)
+  GMAKE_AVAILABLE := $(shell which gmake 2>/dev/null)
+  ifneq ($(GMAKE_AVAILABLE),)
+    $(error This Makefile requires GNU Make. Please run: gmake $(MAKECMDGOALS))
+  else
+    $(error This Makefile requires GNU Make. Please install it: brew install make (macOS) or apt-get install make (Linux), then run: gmake $(MAKECMDGOALS))
+  endif
+endif
+
+# --
 # ## Make & Shell Configuration
 
 SHELL:= bash
