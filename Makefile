@@ -178,6 +178,11 @@ try-uninstall:
 
 build/py-install-%.task:
 	@
+	# Remove task file if it's older than 7 days to force weekly updates
+	if [ -f "$@" ] && [ $$(find "$@" -mtime +7 | wc -l) -gt 0 ]; then \
+		echo "Refreshing $* (task file older than 7 days)"; \
+		rm -f "$@"; \
+	fi
 	mkdir -p "$(PATH_PYTHON_LIB)"
 	if $(PYTHON) -mpip install --target="$(PATH_PYTHON_LIB)" --upgrade '$*'; then
 		mkdir -p "$(dir $@)"
