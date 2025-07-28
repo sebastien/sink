@@ -9,6 +9,8 @@
 
 ``````
 
+[![CI](https://github.com/sebastien/sink/actions/workflows/ci.yml/badge.svg)](https://github.com/sebastien/sink/actions/workflows/ci.yml)
+
 Sink is a the swiss army knife for directory comparison and synchronization.
 With sink, you can:
 

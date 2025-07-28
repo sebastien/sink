@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12', '3.13']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/pip
+          ./run
+        key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/Makefile') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-${{ matrix.python-version }}-
+          ${{ runner.os }}-pip-
+
+    - name: Prepare project dependencies
+      run: |
+        # The Makefile handles dependency installation via prep target
+        make prep
+
+    - name: Run code quality checks
+      run: |
+        # Run the main check target which includes bandit, flakes, and strict mypy
+        make check
+
+    - name: Test compilation
+      run: |
+        # Test the compilation process
+        make compile
+
+    - name: Verify compiled modules
+      run: |
+        # Quick smoke test to ensure compilation worked
+        ls -la sink/
+        python3 -c "import sys; sys.path.insert(0, '.'); import sink; print('✓ Compiled sink module imports successfully')"

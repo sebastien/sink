@@ -68,11 +68,10 @@ audit: check-bandit
 compile:
 	@echo "=== $@"
 	echo "Compiling $(MODULES_PY): $(SOURCES_PY)"
-	# NOTE: Output is going to be like 'extra/__init__.cpython-310-x86_64-linux-gnu.so'
-
+	# NOTE: Output is going to be like '$(PROJECT)/__init__.cpython-310-x86_64-linux-gnu.so'
 	mkdir -p "build"
 	$(foreach M,$(MODULES_PY),mkdir -p build/$M;)
-	env -C build MYPYPATH=$(realpath .)/src/py mypyc -p extra
+	env -C build MYPYPATH=$(realpath .)/src/py mypyc -p $(PROJECT)
 
 .PHONY: check
 check: check-bandit check-flakes check-strict
@@ -101,7 +100,7 @@ check-mypyc: $(PREP_ALL)
 
 .PHONY: check-strict
 check-strict: $(PREP_ALL)
-	count_ok=0
+	@count_ok=0
 	count_err=0
 	files_err=""
 	for item in $(SOURCES_PY); do
