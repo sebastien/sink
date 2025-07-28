@@ -176,13 +176,13 @@ try-uninstall:
 		done
 	fi
 
-build/py-install-%.task:
-	@
-	mkdir -p "$(PATH_PYTHON_LIB)"
-	if $(PYTHON) -mpip install --target="$(PATH_PYTHON_LIB)" --upgrade '$*'; then
-		mkdir -p "$(dir $@)"
-		touch "$@"
-	fi
+build/py-install-%.task: FORCE
+	@mkdir -p "$(PATH_PYTHON_LIB)"
+	@mkdir -p "$(dir $@)"
+	@if [ -f "$@" ] && [ $$(find "$@" -mtime +7 | wc -l) -gt 0 ]; then echo "Refreshing $* (older than 7 days)" && rm -f "$@"; fi
+	@if [ ! -f "$@" ]; then echo "Installing $*" && $(PYTHON) -mpip install --target="$(PATH_PYTHON_LIB)" --upgrade '$*' && touch "$@"; fi
+
+FORCE:
 
 print-%:
 	$(info $*=$($*))
