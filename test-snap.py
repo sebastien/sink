@@ -13,5 +13,5 @@ a = snapshot("../../Current/nzx-ticker-api", rejects=gitignore)
 b = snapshot("../../Current/nzx-ticker-api--SP-playground-DEAD", rejects=gitignore)
 counter = 0
 for path, status in diff(a, b).items():
-    print(f"{counter:04d} {''.join(status)} {path}")
-    counter += 1
+	print(f"{counter:04d} {''.join(status)} {path}")
+	counter += 1

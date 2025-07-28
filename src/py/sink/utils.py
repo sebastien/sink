@@ -45,9 +45,7 @@ def difftool(origin: Path, *other: Path):
 			str(origin.resolve().absolute()),
 			str(_.resolve().absolute()),
 		]
-		subprocess.run(cmd, capture_output=False)
-
-		# shell.
+		subprocess.run(cmd, capture_output=False)  # nosec: B603
 
 
 class CommandError(RuntimeError):

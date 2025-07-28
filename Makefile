@@ -8,12 +8,19 @@ MAKEFLAGS+= --warn-undefined-variables
 MAKEFLAGS+= --no-builtin-rules
 
 # --
+# ## Project Configuration
+PROJECT:=sink
+PYPI_PROJECT=sink
+VERSION:=$(shell grep VERSION setup.py  | head -n1 | cut -d '"' -f2)
+
+# --
 # ## Python Configuration
 
 PYTHON=python3
 PYTHON_MODULES=$(patsubst src/py/%,%,$(wildcard src/py/*))
-PYTHON_MODULES_PIP=flake8 bandit mypy
-PYTHONPATH:=$(abspath run/lib/python)$(if $(PYTHONPATH),:$(PYTHONPATH))
+PYTHON_MODULES_PIP=ruff bandit mypy
+PATH_PYTHON_LIB=run/lib/python
+PYTHONPATH:=$(abspath $(PATH_PYTHON_LIB)$(if $(PYTHONPATH),:$(PYTHONPATH)))
 export PYTHONPATH
 
 # --
@@ -24,8 +31,8 @@ SOURCES_PY_PATH=src/py
 SOURCES_PY:=$(wildcard $(SOURCES_PY_PATH)/*.py $(SOURCES_PY_PATH)/*/*.py $(SOURCES_PY_PATH)/*/*/*.py $(SOURCES_PY_PATH)/*/*/*/*.py)
 MODULES_PY:=$(filter-out %/__main__,$(filter-out %/__init__,$(SOURCES_PY:$(SOURCES_PY_PATH)/%.py=%)))
 
-LOCAL_PY_PATH=$(firstword $(shell $(PYTHON) -c "import sys,pathlib;sys.stdout.write(' '.join([_ for _ in sys.path if _.startswith(str(pathlib.Path.home()))] ))"))
-LOCAL_BIN_PATH=$(HOME)/.local/bin
+PATH_LOCAL_PY=$(firstword $(shell $(PYTHON) -c "import sys,pathlib;sys.stdout.write(' '.join([_ for _ in sys.path if _.startswith(str(pathlib.Path.home()))] ))"))
+PATH_LOCAL_BIN=$(HOME)/.local/bin
 
 PREP_ALL=$(PYTHON_MODULES_PIP:%=build/py-install-%.task)
 
@@ -35,6 +42,7 @@ PREP_ALL=$(PYTHON_MODULES_PIP:%=build/py-install-%.task)
 BANDIT=$(PYTHON) -m bandit
 FLAKE8=$(PYTHON) -m flake8
 MYPY=$(PYTHON) -m mypy
+TWINE=$(PYTHON) -m twine
 MYPYC=mypyc
 
 cmd-check=if ! $$(which $1 &> /dev/null ); then echo "ERR Could not find command $1"; exit 1; fi; $1
@@ -74,7 +82,7 @@ check: check-bandit check-flakes check-strict
 check-compiled:
 	@
 	echo "=== $@"
-	COMPILED=$$(PYTHONPATH=build python -c "import extra;print(extra)")
+	COMPILED=$$(PYTHONPATH=build $(PYTHON) -c "import extra;print(extra)")
 	echo "Extra compiled at: $$COMPILED"
 
 .PHONY: check-bandit
@@ -85,7 +93,7 @@ check-bandit: $(PREP_ALL)
 .PHONY: check-flakes
 check-flakes: $(PREP_ALL)
 	@echo "=== $@"
-	$(FLAKE8) --ignore=E1,E203,E302,E401,E501,E704,E741,E266,F821,W  $(SOURCES_PY)
+	$(FLAKE8) --ignore=E1,E203,E231,E302,E401,E501,E704,E741,E266,F821,W  $(SOURCES_PY)
 
 .PHONY: check-mypyc
 check-mypyc: $(PREP_ALL)
@@ -93,10 +101,9 @@ check-mypyc: $(PREP_ALL)
 
 .PHONY: check-strict
 check-strict: $(PREP_ALL)
-	@
 	count_ok=0
 	count_err=0
-	files_err=
+	files_err=""
 	for item in $(SOURCES_PY); do
 		if $(MYPY) --strict $$item; then
 			count_ok=$$(($$count_ok+1))
@@ -107,9 +114,11 @@ check-strict: $(PREP_ALL)
 	done
 	summary="OK $$count_ok ERR $$count_err TOTAL $$(($$count_err + $$count_ok))"
 	if [ "$$count_err" != "0" ]; then
-		for item in $$files_err; do
-			echo "ERR $$item"
-		done
+		if [ -n "$$files_err" ]; then
+			for item in $$files_err; do
+				echo "ERR $$item"
+			done
+		fi
 		echo "EOS FAIL $$summary"
 		exit 1
 	else
@@ -120,45 +129,58 @@ check-strict: $(PREP_ALL)
 lint: check-flakes
 	@
 
-.PHONY: format
-format:
-	@black $(SOURCES_PY)
+.PHONY: fmt
+fmt:
+	@$(PYTHON) -m ruff format #$(SOURCES_PY)
+
+.PHONY: release-prep
+release-prep: $(PREP_ALL)
+	@
+	# git commit -a -m "[Release] $(PROJECT): $(VERSION)"; true
+	# git tag $(VERSION); true
+	# git push --all; true
+
+.PHONY: release
+release: $(PREP_ALL)
+	@
+	$(PYTHON) setup.py clean sdist bdist_wheel
+	$(TWINE) upload dist/$(subst -,_,$(PYPI_PROJECT))-$(VERSION)*
 
 .PHONY: install
 install:
 	@for file in $(SOURCES_BIN); do
-		echo "Installing $(LOCAL_BIN_PATH)/$$(basename $$file)"
-		ln -sfr $$file "$(LOCAL_BIN_PATH)/$$(basename $$file)"
-		mkdir -p "$(LOCAL_BIN_PATH)"
+		echo "Installing $(PATH_LOCAL_BIN)/$$(basename $$file)"
+		ln -sfr $$file "$(PATH_LOCAL_BIN)/$$(basename $$file)"
+		mkdir -p "$(PATH_LOCAL_BIN)"
 	done
-	if [ ! -e "$(LOCAL_PY_PATH)" ]; then
-		mkdir -p "$(LOCAL_PY_PATH)"
+	if [ ! -e "$(PATH_LOCAL_PY)" ]; then
+		mkdir -p "$(PATH_LOCAL_PY)"
 	fi
-	if [ -d "$(LOCAL_PY_PATH)" ]; then
+	if [ -d "$(PATH_LOCAL_PY)" ]; then
 		for module in $(PYTHON_MODULES); do
-			echo "Installing $(LOCAL_PY_PATH)/$$module"
-			ln -sfr src/py/$$module "$(LOCAL_PY_PATH)"/$$module
+			echo "Installing $(PATH_LOCAL_PY)/$$module"
+			ln -sfr src/py/$$module "$(PATH_LOCAL_PY)"/$$module
 		done
 	else
-		echo "No local Python module path found:  $(LOCAL_PY_PATH)"
+		echo "No local Python module path found:  $(PATH_LOCAL_PY)"
 	fi
 
 
 .PHONY: try-install
 try-uninstall:
 	@for file in $(SOURCES_BIN); do
-		unlink $(LOCAL_BIN_PATH)/$$(basename $$file)
+		unlink $(PATH_LOCAL_BIN)/$$(basename $$file)
 	done
-	if [ -s "$(LOCAL_PY_PATH)" ]; then
+	if [ -s "$(PATH_LOCAL_PY)" ]; then
 		for module in $(PYTHON_MODULES); do
-			unlink "$(LOCAL_PY_PATH)"/$$module
+			unlink "$(PATH_LOCAL_PY)"/$$module
 		done
 	fi
 
 build/py-install-%.task:
 	@
-	mkdir -p run/lib/python
-	if $(PYTHON) -mpip install --target=run/lib/python --upgrade '$*'; then
+	mkdir -p "$(PATH_PYTHON_LIB)"
+	if $(PYTHON) -mpip install --target="$(PATH_PYTHON_LIB)" --upgrade '$*'; then
 		mkdir -p "$(dir $@)"
 		touch "$@"
 	fi

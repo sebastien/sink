@@ -10,9 +10,7 @@ src/node_modules/.vite/deps/preact_hooks.js
 node_modules
 node_modules/vscode-languageserver/lib/common/semantic.ts
 node_modules/vscode-languageserver/lib/common/server.js\
-""".split(
-    "\n"
-)
+""".split("\n")
 
 l = [_ for _ in FILES if matches(_, rejects=pattern(["node_modules"]))]
 assert len(l) == 1, f"Expected 1, got: {l}"
