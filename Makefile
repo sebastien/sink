@@ -18,7 +18,7 @@ VERSION:=$(shell grep VERSION setup.py  | head -n1 | cut -d '"' -f2)
 
 PYTHON=python3
 PYTHON_MODULES=$(patsubst src/py/%,%,$(wildcard src/py/*))
-PYTHON_MODULES_PIP=ruff bandit mypy
+PYTHON_MODULES_PIP=ruff bandit mypy flake8
 PATH_PYTHON_LIB=run/lib/python
 PYTHONPATH:=$(abspath $(PATH_PYTHON_LIB)$(if $(PYTHONPATH),:$(PYTHONPATH)))
 export PYTHONPATH
