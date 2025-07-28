@@ -233,6 +233,7 @@ def gitignored(path: Optional[Path] = None) -> RawFilters:
 			if not path
 			else [path]
 		)
+		if _ is not None
 	]:
 		if p and p.exists():
 			with open(p, "rt") as f:
