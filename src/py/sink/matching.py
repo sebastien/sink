@@ -62,7 +62,7 @@ def makePattern(
 	setlist: Optional[list[str]],
 	sets: dict[str, RawFilters],
 	category: FilterCategory,
-) -> Optional[re.Pattern]:
+) -> Optional[re.Pattern[str]]:
 	"""A helper function for filters"""
 	return pattern(makeFilterList(items, setlist, sets, category))
 
@@ -163,9 +163,9 @@ def pattern(
 			exact.append(m.group("path"))
 		else:
 			partial.append(p)
-	expr_exact, expr_partial = (
+	expr_exact, expr_partial = [
 		"|".join(globre(_) for _ in p) for p in (exact, partial)
-	)
+	]
 	re_raw: str = (
 		f"^({expr_exact}|{expr_partial})(/.*)?$"
 		if (expr_exact and expr_partial)
@@ -218,7 +218,7 @@ def filterset(collection: str) -> RawFilters:
 			)
 
 
-DEFAULT_KEEPS = []
+DEFAULT_KEEPS: list[str] = []
 DEFAULT_REJECTS = [".git", ".svg", "*.swp", ".cache", "*.pyc"]
 
 
@@ -226,14 +226,14 @@ def gitignored(path: Optional[Path] = None) -> RawFilters:
 	"""Returns the list of patterns that are part of the `gitignore` file."""
 	keeps: list[str] = [] + DEFAULT_KEEPS
 	rejects: list[str] = [] + DEFAULT_REJECTS
-	for p in (
+	for p in [
 		Path(_)
 		for _ in (
 			[f"{os.environ['HOME']}/.gitignore", dotfile(".gitignore")]
 			if not path
 			else [path]
 		)
-	):
+	]:
 		if p and p.exists():
 			with open(p, "rt") as f:
 				for pattern in f.readlines():

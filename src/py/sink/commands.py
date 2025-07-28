@@ -65,7 +65,7 @@ def parseDiffRange(text: str) -> DiffRange:
 	rows: list[int] = []
 	for item in select_rows.split(","):
 		if "-" in item:
-			a, b = (int(_) for _ in item.split("-", 1))
+			a, b = [int(_) for _ in item.split("-", 1)]
 			rows += [_ for _ in range(a, b + 1)]
 		else:
 			rows.append(int(item))
@@ -82,7 +82,7 @@ def parseDiffRange(text: str) -> DiffRange:
 # TODO: Seems that snap
 @command("PATH?", *(O_STANDARD + O_FILTERS))
 def snap(
-	cli: CLI,
+	cli: CLI[None],
 	*,
 	# TODO: the cli module does not take care of defaults
 	path: str = ".",
@@ -95,7 +95,7 @@ def snap(
 	acceptSet: Optional[list[str]] = None,
 	keepSet: Optional[list[str]] = None,
 	filterSet: Optional[list[str]] = None,
-):
+) -> None:
 	"""Takes a snapshot of the given file location."""
 
 	active_filters = filters(
@@ -113,7 +113,7 @@ def snap(
 		rejects=active_filters.rejects,
 		keeps=active_filters.keeps,
 	)
-	if output.endswith(".json"):
+	if output and output.endswith(".json"):
 		format = "json"
 	with write(output) as f:
 		if format == "json":
@@ -125,7 +125,7 @@ def snap(
 
 @command("PATH?", *(O_STANDARD + O_FILTERS))
 def _filters(
-	cli: CLI,
+	cli: CLI[None],
 	*,
 	path: str = ".",
 	set: Optional[str] = None,
@@ -138,7 +138,7 @@ def _filters(
 	acceptSet: Optional[list[str]] = None,
 	keepSet: Optional[list[str]] = None,
 	filterSet: Optional[list[str]] = None,
-):
+) -> None:
 	"""Lists the filters active for a given set of parameters."""
 	filters = rawfilters(
 		rejects=ignores,
@@ -171,7 +171,7 @@ def _filters(
 
 @command("PATH+", *(O_STANDARD + O_FILTERS))
 def _list(
-	cli: CLI,
+	cli: CLI[None],
 	*,
 	path: list[str],
 	output: Optional[str] = None,
@@ -183,10 +183,10 @@ def _list(
 	acceptSet: Optional[list[str]] = None,
 	keepSet: Optional[list[str]] = None,
 	filterSet: Optional[list[str]] = None,
-):
+) -> None:
 	"""Prints out the paths in the given snapshot."""
 	snap: Snapshot | None = None
-	f = filters(
+	active_filters = filters(
 		rejects=ignores,
 		accepts=accepts,
 		keeps=keeps,
@@ -195,27 +195,27 @@ def _list(
 		keepSet=keepSet,
 		filterSet=filterSet,
 	)
-	for s in (
+	for s in [
 		snapshot(
 			_,
-			accepts=f.accepts,
-			rejects=f.rejects,
-			keeps=f.keeps,
+			accepts=active_filters.accepts,
+			rejects=active_filters.rejects,
+			keeps=active_filters.keeps,
 		)
 		for _ in path
-	):
+	]:
 		if snap:
 			snap = snap.extend(s.nodes.values())
 		else:
 			snap = s
-	with write(output) as f:
+	with write(output) as out_file:
 		if not snap:
 			pass
 		elif format == "json":
-			json.dump(snap.toPrimitive(), f)
+			json.dump(snap.toPrimitive(), out_file)
 		else:
-			for path in snap.nodes:
-				f.write(f"{path}\n")
+			for path_str in snap.nodes.keys():
+				out_file.write(f"{path_str}\n")
 
 
 SOURCES = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -223,7 +223,7 @@ SOURCES = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 @command("PATH+", "-d|--diff*", "-t|--tool?", *(O_STANDARD + O_FILTERS))
 def diff(
-	cli: CLI,
+	cli: CLI[None],
 	*,
 	path: list[str],
 	format: Optional[str] = None,
@@ -237,7 +237,7 @@ def diff(
 	acceptSet: Optional[list[str]] = None,
 	keepSet: Optional[list[str]] = None,
 	filterSet: Optional[list[str]] = None,
-):
+) -> None:
 	"""Compares the different snapshots of file locations."""
 	f = filters(
 		rejects=ignores,
@@ -315,7 +315,7 @@ def diff(
 	edit_rounds: int = 0
 	# We iterate on the nodes, skipping the ones that have no changes.
 	for i, p_nodes in enumerate(
-		(p, nodes) for p, nodes in compared.items() if has_changes(nodes)
+		[(p, nodes) for p, nodes in compared.items() if has_changes(nodes)]
 	):
 		# We skip any row that is not in the -d sources, if provided.
 		if not has_row(i):

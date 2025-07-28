@@ -7,8 +7,8 @@ import subprocess  # nosec: B404
 
 
 class EnhancedJSONEncoder(JSONEncoder):
-	def default(self, o):
-		if dataclasses.is_dataclass(o):
+	def default(self, o: Any) -> Any:
+		if dataclasses.is_dataclass(o) and not isinstance(o, type):
 			return dataclasses.asdict(o)
 		return super().default(o)
 
@@ -28,17 +28,17 @@ def dotfile(name: str, base: Optional[Path] = None) -> Optional[Path]:
 	while path != path.parent:
 		if (loc := path / name).exists():
 			return loc
-		if path != user_home:
+		if str(path) != user_home:
 			path = path.parent
 		else:
 			break
 	return None
 
 
-def difftool(origin: Path, *other: Path):
+def difftool(origin: Path, *other: Path) -> None:
 	# NOTE: We assume 2 way diff for now
 	tool: str = os.getenv("SINK_DIFF") or os.getenv("DIFFTOOL") or "diff -u"
-	prefix = [_ for _ in (_.strip() for _ in tool.split()) if _]
+	prefix = [_.strip() for _ in tool.split() if _.strip()]
 	for _ in other:
 		# We resolve the paths so that we get the actual files
 		cmd: list[str] = prefix + [
@@ -48,15 +48,15 @@ def difftool(origin: Path, *other: Path):
 		subprocess.run(cmd, capture_output=False)  # nosec: B603
 
 
-class CommandError(RuntimeError):
+class CommandError(Exception):
 	def __init__(self, command: list[str], status: int, err: bytes):
 		super().__init__()
 		self.command = command
 		self.status = status
 		self.err = err
 
-	def __str__(self):
-		return f"CommandError: '{' '.join(self.command)}', failed with status {self.status}: {self.err}"
+	def __str__(self) -> str:
+		return f"CommandError: '{' '.join(self.command)}', failed with status {self.status}: {self.err!r}"
 
 
 # FIXME: Does not do streaming

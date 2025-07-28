@@ -22,7 +22,7 @@ RE_ARG = re.compile(r"\s*(?P<arg>[a-z0-9]+|[A-Z]+):(?P<text>.*)$")
 # --
 # Commands are aggregated into the `COMMANDS` dictionary, which can
 # then be fed to `argparse`.
-TArgument = tuple[list[str], dict[str, str]]
+TArgument = tuple[list[str], dict[str, Any]]
 COMMANDS: dict[str, "Command"] = {}
 
 
@@ -34,7 +34,7 @@ def camelCase(text: str) -> str:
 
 
 @contextmanager
-def write(path: Optional[str] = None, append=False) -> Iterator[TextIOWrapper]:
+def write(path: Optional[str] = None, append: bool = False) -> Iterator[TextIOWrapper]:
 	"""Returns a writable file-like text object"""
 	output: Optional[str] = None if path in (None, "-") else path
 	try:
@@ -49,15 +49,19 @@ def write(path: Optional[str] = None, append=False) -> Iterator[TextIOWrapper]:
 		pass
 
 
-def copydoc(functor):
-	def decorator(f):
+def copydoc(
+	functor: Callable[..., Any],
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+	def decorator(f: Callable[..., Any]) -> Callable[..., Any]:
 		f.__doc__ = functor.__doc__
 		return f
 
 	return decorator
 
 
-def option(*args, **kwargs):
+def option(
+	*args: Any, **kwargs: Any
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
 	"""Returns a functor that can be applied to an argparse
 	`parser.add_argument` method."""
 	return lambda f: f(*args, **kwargs)
@@ -74,13 +78,15 @@ class Command(NamedTuple):
 	functor: Callable[[Any], Any]
 	doc: Optional[str]
 	args: dict[str, TArgument]
-	options: list[Callable]
+	options: list[Callable[..., Any]]
 	aliases: list[str]
 
 
 def command(
-	*args: str, options: Optional[list[Callable]] = None, alias: Optional[str] = None
-):
+	*args: str,
+	options: Optional[list[Callable[..., Any]]] = None,
+	alias: Optional[str] = None,
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
 	"""Decorator used to register a function as a CLI command. Arguments
 	are like `("-o","-f|--format", "FILE+")` and the decorated function
 	should have a documentation that contains lines like
@@ -91,7 +97,7 @@ def command(
 		# The following extracts the `argparse.add_argument` information and
 		# stores it in `p_args` and `p_kwargs`.
 		p_args: list[str] = []
-		p_kwargs: dict[str, str] = {}
+		p_kwargs: dict[str, Any] = {}
 		if not (m := RE_COMMAND.match(p)):
 			raise ValueError(
 				f"Incorrect argument format: {p} for argument {i} in {args}"
@@ -128,7 +134,9 @@ def command(
 	pythonArgNames = {camelCase(_): _ for _ in cli_args}
 
 	# That's the decorator's wrapper
-	def wrapper(f: Callable, alias=alias):
+	def wrapper(
+		f: Callable[..., Any], alias: Optional[str] = alias
+	) -> Callable[..., Any]:
 		# We now extract the arguments help from the command line
 		# help, and update the `cli_args` accordingly.
 		doc: list[str] = []
@@ -184,7 +192,7 @@ class CLI(Generic[T]):
 	def ask(self, prompt: str) -> str:
 		return input(prompt)
 
-	def out(self, text: str):
+	def out(self, text: str) -> None:
 		sys.stdout.write(text)
 
 
@@ -192,7 +200,10 @@ class CLI(Generic[T]):
 # This is the entry point to process the command line function registered
 # in the `COMMANDS` mapping.
 def run(
-	args: list[str] = sys.argv[1:], name=None, description=None, context=None
+	args: list[str] = sys.argv[1:],
+	name: Optional[str] = None,
+	description: Optional[str] = None,
+	context: Optional[Any] = None,
 ) -> int:
 	"""Runs the given command, as passed on the command line"""
 	# FROM: https://stackoverflow.com/questions/10448200/how-to-parse-multiple-nested-sub-commands-using-python-argparse
@@ -239,7 +250,7 @@ def run(
 				f" - argument values are: {fun_kwargs}\n"
 			)
 			raise e
-		return result
+		return result or 0
 	else:
 		# FIXME: Not sure what is going in there
 		raise RuntimeError("Unexpected arguments")

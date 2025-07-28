@@ -18,7 +18,7 @@ class Metric:
 		self.update = now()
 		self.last = value
 
-	def inc(self):
+	def inc(self) -> None:
 		self.value += 1
 		t = now()
 		if t - self.update < self.THROTTLING:
@@ -30,36 +30,36 @@ class Metric:
 @dataclass
 class Event:
 	name: str
-	value: Optional[dict] = None
+	value: Optional[dict[str, Any]] = None
 
 
 @dataclass
 class Log:
 	message: str
 	level: Level
-	data: Optional[dict] = None
+	data: Optional[dict[str, Any]] = None
 
 
 class Counter(Metric):
 	pass
 
 
-def fmtJSON(data):
-	json.dumps(data)
+def fmtJSON(data: Any) -> str:
+	return json.dumps(data)
 
 
-def fmtPairs(data: dict):
+def fmtPairs(data: dict[str, Any]) -> str:
 	return ", ".join(f"{k}={fmtJSON(v)}" for k, v in data.items()) if data else ""
 
 
-def show(data: Union[Log, Metric, Event]):
+def show(data: Union[Log, Metric, Event]) -> None:
 	return None
 	if isinstance(data, Event):
 		print(f" → {data.name}: {fmtJSON(data.value)}")
 	elif isinstance(data, Metric):
 		print(f" . {data.name}={data.value}")
 	elif isinstance(data, Log):
-		print(f" ! {data.message}: {fmtPairs(metric.data)}")
+		print(f" ! {data.message}: {fmtPairs(data.data or {})}")
 	else:
 		pass
 
@@ -73,11 +73,13 @@ def metric(name: str) -> Metric:
 	return METRICS[name]
 
 
-def event(name: str, data: Optional[dict[str, Any]]):
+def event(name: str, data: Optional[dict[str, Any]] = None) -> None:
 	show(Event(name, data))
 
 
-def log(message: str, level: Level = Level.LOG, data: Optional[dict[str, Any]] = None):
+def log(
+	message: str, level: Level = Level.LOG, data: Optional[dict[str, Any]] = None
+) -> None:
 	show(Log(message, level, data))
 
 

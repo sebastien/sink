@@ -1,19 +1,20 @@
-from .model import Node, Snapshot, Optional, Status
+from .model import Node, Snapshot, Status
+from typing import Optional
 
 # --
 # ## Directory diffing command
 
 
 def compareNodes(a: Optional[Node], b: Optional[Node]) -> int:
-	pass
+	return 0
 
 
 def compareSignature(a: Optional[Node], b: Optional[Node]) -> int:
-	pass
+	return 0
 
 
 def compareMeta(a: Optional[Node], b: Optional[Node]) -> int:
-	pass
+	return 0
 
 
 def status(origin: Optional[Node], *others: Optional[Node]) -> list[Status]:

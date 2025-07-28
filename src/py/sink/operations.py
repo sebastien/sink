@@ -25,7 +25,8 @@ class Operations:
 			if not isinstance(data, dict):
 				return None
 			else:
-				return Snapshot((_ for _ in (self.node_restore(_) for _ in data) if _))
+				nodes = [self.node_restore(_) for _ in data]
+				return Snapshot([_ for _ in nodes if _])
 
 	def snapshot_save(self, path: str, snapshot: Snapshot) -> Snapshot:
 		with open(path, "wt") as f:

@@ -1,4 +1,4 @@
-from typing import Optional, Iterable, Iterator
+from typing import Optional, Iterable, Iterator, Any, Final
 from dataclasses import dataclass
 from enum import Enum
 
@@ -34,12 +34,12 @@ class NodeDifference:
 class NodeType:
 	"""A simplified categorisation of node types"""
 
-	NULL: int = 0
-	FILE: int = 1
-	LINK: int = 2
-	DIRECTORY: int = 3
-	SPECIAL: int = 10
-	UNKNOWN: int = 100
+	NULL: Final[int] = 0
+	FILE: Final[int] = 1
+	LINK: Final[int] = 2
+	DIRECTORY: Final[int] = 3
+	SPECIAL: Final[int] = 10
+	UNKNOWN: Final[int] = 100
 
 
 @dataclass
@@ -54,10 +54,10 @@ class NodeMeta:
 	mtime: float
 
 	@staticmethod
-	def FromPrimitive(value) -> "NodeMeta":
+	def FromPrimitive(value: dict[str, Any]) -> "NodeMeta":
 		return NodeMeta(**value)
 
-	def toPrimitive(self) -> dict:
+	def toPrimitive(self) -> dict[str, Any]:
 		return dict(
 			mode=self.mode,
 			uid=self.uid,
@@ -78,13 +78,13 @@ class Node:
 	sig: Optional[str] = None
 
 	@staticmethod
-	def FromPrimitive(value) -> "Node":
+	def FromPrimitive(value: dict[str, Any]) -> "Node":
 		return Node(
 			path=value["path"],
 			type=value["type"],
 			meta=(
-				NodeMeta.FromPrimitive(value.get("NodeMeta"))
-				if "NodeMeta" in value
+				NodeMeta.FromPrimitive(value["meta"])
+				if "meta" in value and value["meta"] is not None
 				else None
 			),
 			sig=value.get("sig"),
@@ -105,7 +105,7 @@ class Node:
 				else False
 			)
 
-	def toPrimitive(self) -> dict:
+	def toPrimitive(self) -> dict[str, Any]:
 		return {
 			"path": self.path,
 			"type": self.type,
@@ -121,10 +121,10 @@ class Snapshot:
 	"""Represents a collection of node states."""
 
 	@staticmethod
-	def FromPrimitive(value) -> "Snapshot":
+	def FromPrimitive(value: dict[str, Any]) -> "Snapshot":
 		return Snapshot(
 			nodes=(
-				{k: Node.FromPrimitive(v) for k, v in value.get("nodes").items()}
+				{k: Node.FromPrimitive(v) for k, v in value["nodes"].items()}
 				if value.get("nodes")
 				else None
 			),
@@ -135,7 +135,7 @@ class Snapshot:
 		if nodes and not isinstance(nodes, dict):
 			self.extend(nodes)
 
-	def extend(self, nodes: Iterable[Node]):
+	def extend(self, nodes: Iterable[Node]) -> "Snapshot":
 		for node in nodes:
 			if (path := node.path) in self.nodes:
 				raise RuntimeError(f"Node already registered: {path}")
@@ -145,7 +145,7 @@ class Snapshot:
 	def __iter__(self) -> Iterator[Node]:
 		yield from self.nodes.values()
 
-	def toPrimitive(self) -> dict:
+	def toPrimitive(self) -> dict[str, Any]:
 		return {"nodes": {k: v.toPrimitive() for k, v in self.nodes.items()}}
 
 
