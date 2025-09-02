@@ -40,6 +40,7 @@ def status(origin: Optional[Node], *others: Optional[Node]) -> list[Status]:
 		elif not origin:
 			res.append(Status.ADDED)
 			added_count += 1
+		# TODO: We should distinguish between type, content and meta changes
 		elif other.hasChanged(origin):
 			if other.isNewer(origin):
 				res.append(Status.NEWER)

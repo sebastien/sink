@@ -22,6 +22,14 @@ class Status(Enum):
 	ORIGIN = " . "
 
 
+class Change(Enum):
+	"""Defines the type of change"""
+
+	TYPE = "t"
+	META = "m"
+	DATA = "d"
+
+
 class NodeDifference:
 	"""Flags to capture the difference between when comparing nodes"""
 
@@ -114,7 +122,20 @@ class Node:
 		}
 
 	def hasChanged(self, other: Optional["Node"]) -> bool:
-		return self.sig != other.sig and self.meta != other.meta if other else False
+		return (
+			self.hasTypeChanged(other)
+			or self.hasContentChanged(other)
+			or self.hasMetaChanged(other)
+		)
+
+	def hasTypeChanged(self, other: Optional["Node"]) -> bool:
+		return self.type != other.type if other else True
+
+	def hasContentChanged(self, other: Optional["Node"]) -> bool:
+		return self.sig != other.sig if other else True
+
+	def hasMetaChanged(self, other: Optional["Node"]) -> bool:
+		return self.meta != other.meta if other else True
 
 
 class Snapshot:
