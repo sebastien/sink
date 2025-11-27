@@ -8,6 +8,8 @@ from .matching import (
 	filters,
 	rawfilters,
 )
+from .backup import iscript
+from .snap import snapshot
 from typing import Optional, NamedTuple
 from pathlib import Path
 import json
@@ -355,6 +357,64 @@ def diff(
 			print("PATHS", paths)
 			difftool(*paths)
 			edit_rounds += 1
+
+
+@command("SRC", "PATH?", "-r|--root?", "-t|--type?", *(O_STANDARD + O_FILTERS))
+def backup(
+	cli: CLI[None],
+	*,
+	src: str,
+	path: Optional[str] = None,
+	root: Optional[str] = None,
+	type: str = "script",
+	output: Optional[str] = None,
+	format: Optional[str] = None,
+	ignores: Optional[list[str]] = None,
+	accepts: Optional[list[str]] = None,
+	keeps: Optional[list[str]] = None,
+	ignoreSet: Optional[list[str]] = None,
+	acceptSet: Optional[list[str]] = None,
+	keepSet: Optional[list[str]] = None,
+	filterSet: Optional[list[str]] = None,
+) -> None:
+	"""Outputs commands that describe changes to make PATH_OR_SNAPSHOT like SRC_PATH."""
+	if type != "script":
+		raise ValueError(f"Unsupported backup type: {type}. Only 'script' is supported.")
+
+	active_filters = filters(
+		rejects=ignores,
+		accepts=accepts,
+		keeps=keeps,
+		rejectSet=ignoreSet,
+		acceptSet=acceptSet,
+		keepSet=keepSet,
+		filterSet=filterSet,
+	)
+
+	# Create snapshot for SRC
+	current = snapshot(
+		src,
+		accepts=active_filters.accepts,
+		rejects=active_filters.rejects,
+		keeps=active_filters.keeps,
+	)
+
+	# Create snapshot for PATH if provided
+	other = None
+	if path:
+		other = snapshot(
+			path,
+			accepts=active_filters.accepts,
+			rejects=active_filters.rejects,
+			keeps=active_filters.keeps,
+		)
+
+	# Use root path for relative paths, default to src
+	root_path = root if root else src
+
+	with write(output) as f:
+		for line in iscript(current, other, root_path):
+			f.write(f"{line}\n")
 
 
 # EOF
