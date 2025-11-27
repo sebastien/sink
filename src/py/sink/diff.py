@@ -50,9 +50,16 @@ def status(origin: Optional[Node], *others: Optional[Node]) -> list[Status]:
 				res.append(Status.OLDER)
 				older_count += 1
 				changed_count += 1
-			else:
+			elif other.hasContentChanged(origin):
 				res.append(Status.CHANGED)
 				changed_count += 1
+			elif other.hasTypeChanged(origin):
+				res.append(Status.CHANGED)
+				changed_count += 1
+			else:
+				res.append(Status.META_CHANGED)
+				# Meta has changed, so we don't mark it
+				pass
 		else:
 			res.append(Status.SAME)
 	# We compare the origin with the rest

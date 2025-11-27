@@ -20,6 +20,7 @@ class Status(Enum):
 	CHANGED = " ~ "
 	ABSENT = " ! "
 	ORIGIN = " . "
+	META_CHANGED = " ^ "
 
 
 class Change(Enum):
@@ -121,11 +122,11 @@ class Node:
 			"sig": self.sig,
 		}
 
-	def hasChanged(self, other: Optional["Node"]) -> bool:
+	def hasChanged(self, other: Optional["Node"], meta: bool = False) -> bool:
 		return (
 			self.hasTypeChanged(other)
 			or self.hasContentChanged(other)
-			or self.hasMetaChanged(other)
+			or (meta and self.hasMetaChanged(other))
 		)
 
 	def hasTypeChanged(self, other: Optional["Node"]) -> bool:

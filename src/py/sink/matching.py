@@ -137,14 +137,21 @@ RE_EXACT = re.compile(r"^(/|./)(?P<path>.*)$")
 
 
 def globre(text: str) -> str:
-	"""Converts a glob to regexp"""
+	"""Converts a glob to regexp.
+
+	We strip the wrapper that `fnmatch.translate` adds, which typically
+	adds a `(?s:...)` prefix and a `)\\Z` or `)\\z` suffix around the
+	translated pattern. We accept either suffix to remain compatible with
+	different Python versions.
+	"""
 	t: str = fnmatch.translate(text)
 	p: str = "(?s:"
-	s: str = ")\\Z"
 	if t.startswith(p):
 		t = t[len(p) :]
-	if t.endswith(s):
-		t = t[: -len(s)]
+	for s in (")\\Z", ")\\z"):
+		if t.endswith(s):
+			t = t[: -len(s)]
+			break
 	return t
 
 
